@@ -1,0 +1,25 @@
+sa2b-android-recomp/
+??? CMakeLists.txt                 # Script de build principal para o Android NDK (CMake)
+??? config.yml                     # Configuração do decomp-toolkit (dtk) para o GSAE01
+??? symbols.txt                    # Tabela de símbolos conhecidos do SA2B (USA)
+??? include/                       # Cabeçalhos (Headers) do projeto
+?   ??? ppc_context.h              # Registradores Gekko, macros de Endianness e memória RAM
+?   ??? dolphin_os.h               # Stubs das APIs do sistema do GameCube (OS, DVD, AX)
+?   ??? gx_backend.h               # Tradutor do pipeline gráfico GX para OpenGL ES 3.0
+?   ??? vfs.h                      # Protótipos do Sistema de Arquivos Virtual (Android Assets)
+??? src/                           # Código-fonte em C/C++ da camada de plataforma
+?   ??? main.cpp                   # Inicialização do SDL2, contexto OpenGL ES e loop nativo
+?   ??? dolphin_os.cpp             # Gerenciamento de memória e chamadas de sistema do GC
+?   ??? gx_backend.cpp             # Tradução de Display Lists/TEV para shaders do Android
+?   ??? vfs.cpp                    # Implementação do VFS usando o AAssetManager do NDK
+?   ??? recomp/                    # Onde entram os arquivos C gerados pelo decomp-toolkit
+?       ??? main_dol_code.c        # Código C gerado a partir das funções do main.dol
+?       ??? ...                    # Outros módulos e arquivos .c do binário
+??? tools/                         # Scripts auxiliares de automação
+?   ??? extract_iso.sh             # Script para extrair sys/main.dol e arquivos da ISO
+??? assets/                        # Recursos brutos extraídos da versão USA (GSAE01)
+    ??? sys/
+    ?   ??? main.dol               # O binário principal extraído da ISO
+    ??? files/                     # Arquivos do jogo (mapas, texturas .gvm, áudio .adx, .prs)
+        ??? data/
+        ??? ...
