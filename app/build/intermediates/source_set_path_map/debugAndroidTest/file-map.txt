@@ -1,0 +1,4 @@
+com.example.sa2b.test.app-androidTest-0 C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\generated\res\resValues\androidTest\debug
+com.example.sa2b.test.app-mergeDebugAndroidTestResources-1 C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+com.example.sa2b.test.app-mergeDebugAndroidTestResources-2 C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+com.example.sa2b.test.app-merged_res-3 C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\merged_res\debugAndroidTest
