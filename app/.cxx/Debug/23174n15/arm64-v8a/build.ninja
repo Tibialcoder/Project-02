@@ -11,7 +11,7 @@
 # =============================================================================
 
 # =============================================================================
-# Project: Project
+# Project: sa2b_engine
 # Configurations: Debug
 # =============================================================================
 
@@ -40,6 +40,45 @@ include CMakeFiles/rules.ninja
 # Logical path to working directory; prefix for absolute paths.
 
 cmake_ninja_workdir = C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/.cxx/Debug/23174n15/arm64-v8a/
+# =============================================================================
+# Object build statements for SHARED_LIBRARY target sa2b_engine
+
+
+#############################################
+# Order-only phony target for sa2b_engine
+
+build cmake_object_order_depends_target_sa2b_engine: phony || CMakeFiles/sa2b_engine.dir
+
+build CMakeFiles/sa2b_engine.dir/native-lib.cpp.o: CXX_COMPILER__sa2b_engine_Debug C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/src/main/cpp/native-lib.cpp || cmake_object_order_depends_target_sa2b_engine
+  DEFINES = -Dsa2b_engine_EXPORTS
+  DEP_FILE = CMakeFiles\sa2b_engine.dir\native-lib.cpp.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info  -fPIC
+  OBJECT_DIR = CMakeFiles\sa2b_engine.dir
+  OBJECT_FILE_DIR = CMakeFiles\sa2b_engine.dir
+  TARGET_COMPILE_PDB = CMakeFiles\sa2b_engine.dir\
+  TARGET_PDB = "C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\cxx\Debug\23174n15\obj\arm64-v8a\libsa2b_engine.pdb"
+
+
+# =============================================================================
+# Link build statements for SHARED_LIBRARY target sa2b_engine
+
+
+#############################################
+# Link the shared library C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\cxx\Debug\23174n15\obj\arm64-v8a\libsa2b_engine.so
+
+build C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so: CXX_SHARED_LIBRARY_LINKER__sa2b_engine_Debug CMakeFiles/sa2b_engine.dir/native-lib.cpp.o | C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/liblog.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libandroid.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libGLESv3.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libEGL.so
+  LANGUAGE_COMPILE_FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info
+  LINK_FLAGS = -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--fatal-warnings -Wl,--gc-sections -Wl,--no-undefined -Qunused-arguments
+  LINK_LIBRARIES = C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/liblog.so  C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libandroid.so  C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libGLESv3.so  C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libEGL.so  -latomic -lm
+  OBJECT_DIR = CMakeFiles\sa2b_engine.dir
+  POST_BUILD = cd .
+  PRE_LINK = cd .
+  SONAME = libsa2b_engine.so
+  SONAME_FLAG = -Wl,-soname,
+  TARGET_COMPILE_PDB = CMakeFiles\sa2b_engine.dir\
+  TARGET_FILE = "C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\cxx\Debug\23174n15\obj\arm64-v8a\libsa2b_engine.so"
+  TARGET_PDB = "C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\cxx\Debug\23174n15\obj\arm64-v8a\libsa2b_engine.pdb"
+
 
 #############################################
 # Utility command for edit_cache
@@ -66,6 +105,10 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 # =============================================================================
 # Target aliases.
 
+build libsa2b_engine.so: phony C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so
+
+build sa2b_engine: phony C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so
+
 # =============================================================================
 # Folder targets.
 
@@ -74,7 +117,7 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 #############################################
 # Folder: C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/.cxx/Debug/23174n15/arm64-v8a
 
-build all: phony
+build all: phony C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so
 
 # =============================================================================
 # Built-in targets

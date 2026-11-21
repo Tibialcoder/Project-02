@@ -1,0 +1,2 @@
+ninja: Entering directory `C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\.cxx\Debug\23174n15\arm64-v8a'
+ninja: no work to do.

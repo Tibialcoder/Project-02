@@ -1,4 +1,11 @@
 R_DEF: Internal format may change without notice
 local
+id btnSelectIso
+id glSurfaceView
+id txtCurrentFile
+id txtProgress
+layout activity_game
+layout activity_main
+layout activity_splash
 mipmap ic_launcher
 string app_name

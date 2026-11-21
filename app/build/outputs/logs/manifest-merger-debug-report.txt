@@ -8,6 +8,7 @@ MERGED from [com.google.android.material:material:1.9.0] C:\Users\hiury\.gradle\
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\hiury\.gradle\caches\transforms-3\dcc78b2f4a3d879e4e36052f1930563b\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] C:\Users\hiury\.gradle\caches\transforms-3\241e9d5c276921da3f296e4baa64f37e\transformed\constraintlayout-2.0.1\AndroidManifest.xml:2:1-11:12
 MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\hiury\.gradle\caches\transforms-3\1269e761ba2b2764df14d796e474c793\transformed\appcompat-1.6.1\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.games:games-activity:3.0.5] C:\Users\hiury\.gradle\caches\transforms-3\302fd149da62937e1118206cc00664f1\transformed\jetified-games-activity-3.0.5\AndroidManifest.xml:2:1-9:12
 MERGED from [androidx.viewpager2:viewpager2:1.0.0] C:\Users\hiury\.gradle\caches\transforms-3\fb49cafff1a3e07b9d521461cce18e18\transformed\jetified-viewpager2-1.0.0\AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.fragment:fragment:1.3.6] C:\Users\hiury\.gradle\caches\transforms-3\4a11e6aca8deda0d389cc913a41ef35f\transformed\fragment-1.3.6\AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.activity:activity:1.6.0] C:\Users\hiury\.gradle\caches\transforms-3\60ec67f5e9e57de5e15ed07ea262f321\transformed\jetified-activity-1.6.0\AndroidManifest.xml:17:1-22:12
@@ -111,6 +112,8 @@ MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] C:\Users\hiury\.g
 MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] C:\Users\hiury\.gradle\caches\transforms-3\241e9d5c276921da3f296e4baa64f37e\transformed\constraintlayout-2.0.1\AndroidManifest.xml:5:5-7:41
 MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\hiury\.gradle\caches\transforms-3\1269e761ba2b2764df14d796e474c793\transformed\appcompat-1.6.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\hiury\.gradle\caches\transforms-3\1269e761ba2b2764df14d796e474c793\transformed\appcompat-1.6.1\AndroidManifest.xml:20:5-44
+MERGED from [androidx.games:games-activity:3.0.5] C:\Users\hiury\.gradle\caches\transforms-3\302fd149da62937e1118206cc00664f1\transformed\jetified-games-activity-3.0.5\AndroidManifest.xml:5:5-7:41
+MERGED from [androidx.games:games-activity:3.0.5] C:\Users\hiury\.gradle\caches\transforms-3\302fd149da62937e1118206cc00664f1\transformed\jetified-games-activity-3.0.5\AndroidManifest.xml:5:5-7:41
 MERGED from [androidx.viewpager2:viewpager2:1.0.0] C:\Users\hiury\.gradle\caches\transforms-3\fb49cafff1a3e07b9d521461cce18e18\transformed\jetified-viewpager2-1.0.0\AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.viewpager2:viewpager2:1.0.0] C:\Users\hiury\.gradle\caches\transforms-3\fb49cafff1a3e07b9d521461cce18e18\transformed\jetified-viewpager2-1.0.0\AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.fragment:fragment:1.3.6] C:\Users\hiury\.gradle\caches\transforms-3\4a11e6aca8deda0d389cc913a41ef35f\transformed\fragment-1.3.6\AndroidManifest.xml:20:5-22:41
