@@ -34,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     public static native void nativeLoadISO(int fileDescriptor);
     public native boolean nativeExtractFile(int fileDescriptor, String fileName, String outputPath);
     public native boolean nativeExtractAll(int fileDescriptor, String outputDirPath);
+    public native void nativeInitPipeline(String basePath);
     private GLSurfaceView glSurfaceView;
     private TextView txtProgress;
     private TextView txtCurrentFile;
@@ -98,6 +99,10 @@ public class MainActivity extends AppCompatActivity {
 
         File documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
         File project02Dir = new File(documentsDir, "Project-02");
+
+        // Processa arquivos pendentes em segundo plano sem bloquear a abertura da tela.
+        new Thread(() -> nativeInitPipeline(project02Dir.getAbsolutePath()),
+                "sa2b-init-pipeline").start();
 
         if (isFirstBoot(project02Dir)) {
             setContentView(R.layout.activity_main);

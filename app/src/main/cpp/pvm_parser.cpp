@@ -1,11 +1,14 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <algorithm>
+#include <cstring>
 #include <android/log.h>
 
 #define LOG_TAG "SA2B_Parser"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
 // Estrutura do cabeçalho PVM (Padrão SEGA PVRT/PVM)
 #pragma pack(push, 1)
@@ -47,35 +50,61 @@ bool ExtractPVMContainer(const std::vector<uint8_t>& pvmFileData, std::vector<Ex
     LOGI("=== Lendo Container PVM ===");
     LOGI("Total de texturas encontradas no pacote: %u", header->entryCount);
 
-    // O ponteiro para a primeira entrada logo após o cabeçalho principal
+    struct TempEntryInfo {
+        std::string name;
+        uint32_t offset;
+    };
+    std::vector<TempEntryInfo> entriesList;
+
     const uint8_t* ptr = pvmFileData.data() + sizeof(PVMHeader);
     const uint8_t* endPtr = pvmFileData.data() + pvmFileData.size();
 
+    // Primeira passagem: coleta nomes e offsets válidos da tabela.
     for (uint32_t i = 0; i < header->entryCount; ++i) {
-        if (ptr + sizeof(PVMEntryHeader) > endPtr) {
+        if (static_cast<size_t>(endPtr - ptr) < sizeof(PVMEntryHeader)) {
             LOGE("Erro: Fim do arquivo inesperado ao ler a entrada %u", i);
             return false;
         }
 
         const PVMEntryHeader* entry = reinterpret_cast<const PVMEntryHeader*>(ptr);
+        const char* nameEnd = std::find(
+                entry->name, entry->name + sizeof(entry->name), '\0');
+        std::string texName(entry->name, nameEnd);
 
-        // O nome da textura armazenada (garantindo o encerramento com '\0')
-        std::string texName(entry->name, strnlen(entry->name, sizeof(entry->name)));
+        LOGI(" - Textura [%u]: %s | Offset: %u",
+             i, texName.c_str(), entry->dataOffset);
 
-        LOGI(" - Textura [%u]: %s | Offset: %u", i, texName.c_str(), entry->dataOffset);
+        if (entry->dataOffset > 0
+                && static_cast<size_t>(entry->dataOffset) < pvmFileData.size()) {
+            entriesList.push_back({texName, entry->dataOffset});
+        }
+        ptr += sizeof(PVMEntryHeader);
+    }
 
-        // Se o dataOffset estiver definido, extraímos os bytes do PVR correspondente
-        if (entry->dataOffset > 0 && entry->dataOffset < pvmFileData.size()) {
-            // Nota: Em alguns formatos PVM, os offsets apontam diretamente para os dados PVR.
-            // Precisamos calcular o tamanho olhando para a próxima entrada ou o fim do arquivo.
-            // Para simplificar a extração inicial, vamos capturar a região de dados:
+    // Segunda passagem: extrai cada bloco até o próximo offset ou o fim do PVM.
+    for (size_t i = 0; i < entriesList.size(); ++i) {
+        const size_t startOffset = entriesList[i].offset;
+        const size_t endOffset = i + 1 < entriesList.size()
+                ? entriesList[i + 1].offset
+                : pvmFileData.size();
 
-            // (Opcional) Localiza o próximo offset para definir o tamanho exato do PVR atual
-            // ...
+        if (endOffset <= startOffset) {
+            LOGW("Offset inválido para textura: %s", entriesList[i].name.c_str());
+            continue;
         }
 
-        // Avança para a próxima entrada no cabeçalho/tabela do PVM
-        ptr += sizeof(PVMEntryHeader);
+        const size_t pvrSize = endOffset - startOffset;
+        ExtractedTexture extTex;
+        extTex.name = entriesList[i].name;
+        extTex.pvrData.resize(pvrSize);
+        std::memcpy(
+                extTex.pvrData.data(),
+                pvmFileData.data() + startOffset,
+                pvrSize);
+
+        outTextures.push_back(extTex);
+        LOGI(" - Extraído PVR: %s (Tamanho: %zu bytes)",
+             extTex.name.c_str(), pvrSize);
     }
 
     return true;

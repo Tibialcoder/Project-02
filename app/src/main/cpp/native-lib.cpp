@@ -18,206 +18,25 @@
 #include <utility>
 #include <cstdint>
 #include <chrono>
+#include <limits>
+#include <filesystem>
+#include "prs_decompressor.h"
+#include "texture_translation.h"
+#include "resource_file_manager.h"
+#include "resource_pipeline.h"
+
+namespace fs = std::filesystem;
 
 #define LOG_TAG "SA2B_Engine"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-#define TEXTURE_TRANSLATOR_LOG_TAG "SA2B_TEXTURE_TRANSLATOR"
-#define PVM_PARSER_LOG_TAG "SA2B_PVM_PARSER"
 
-struct TextureInfo {
-    uint32_t globalIndex;
-    uint32_t width;
-    uint32_t height;
-    std::vector<uint8_t> pixelData;
-};
 
-TextureInfo parsePVRTexture(const std::string& filePath) {
-    TextureInfo tex{0, 0, 0, {}};
 
-    FILE* file = std::fopen(filePath.c_str(), "rb");
-    if (!file) {
-        __android_log_print(
-                ANDROID_LOG_ERROR,
-                PVM_PARSER_LOG_TAG,
-                "Erro ao abrir textura: %s",
-                filePath.c_str());
-        return tex;
-    }
 
-    char magicGBIX[4];
-    if (std::fread(magicGBIX, 1, sizeof(magicGBIX), file) == sizeof(magicGBIX)
-            && std::string(magicGBIX, sizeof(magicGBIX)) == "GBIX") {
-        uint32_t gbixSize = 0;
-        uint32_t globalIndex = 0;
-        std::fread(&gbixSize, sizeof(gbixSize), 1, file);
-        std::fread(&globalIndex, sizeof(globalIndex), 1, file);
 
-        tex.globalIndex = globalIndex;
-        __android_log_print(
-                ANDROID_LOG_INFO,
-                PVM_PARSER_LOG_TAG,
-                "GBIX encontrado! Global Index: %u",
-                globalIndex);
-    } else {
-        std::rewind(file);
-    }
 
-    char magicPVRT[4];
-    if (std::fread(magicPVRT, 1, sizeof(magicPVRT), file) == sizeof(magicPVRT)
-            && std::string(magicPVRT, sizeof(magicPVRT)) == "PVRT") {
-        uint32_t pvrtSize = 0;
-        std::fread(&pvrtSize, sizeof(pvrtSize), 1, file);
-
-        uint8_t pvrHeader[16] = {};
-        if (std::fread(pvrHeader, 1, sizeof(pvrHeader), file) == sizeof(pvrHeader)) {
-            tex.width = pvrHeader[4];
-            tex.height = pvrHeader[5];
-
-            __android_log_print(
-                    ANDROID_LOG_INFO,
-                    PVM_PARSER_LOG_TAG,
-                    "PVR lido com sucesso. Dimensões: %u x %u",
-                    tex.width,
-                    tex.height);
-        }
-    }
-
-    std::fclose(file);
-    return tex;
-}
-
-std::vector<uint8_t> convertToRGBA8888(
-        const uint8_t* srcData,
-        int width,
-        int height,
-        int /* format */) {
-    if (srcData == nullptr || width <= 0 || height <= 0) {
-        return {};
-    }
-
-    const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
-    std::vector<uint8_t> rgbaPixels(pixelCount * 4);
-    const uint16_t* src16 = reinterpret_cast<const uint16_t*>(srcData);
-
-    for (size_t i = 0; i < pixelCount; ++i) {
-        const uint16_t pixel = src16[i];
-        rgbaPixels[i * 4] = static_cast<uint8_t>(((pixel >> 8) & 0x0F) * 17);
-        rgbaPixels[i * 4 + 1] = static_cast<uint8_t>(((pixel >> 4) & 0x0F) * 17);
-        rgbaPixels[i * 4 + 2] = static_cast<uint8_t>((pixel & 0x0F) * 17);
-        rgbaPixels[i * 4 + 3] = static_cast<uint8_t>(((pixel >> 12) & 0x0F) * 17);
-    }
-
-    return rgbaPixels;
-}
-
-void translateAndSaveTextures(const std::string& baseDirPath) {
-    const std::string tempTextPath = baseDirPath + "/temp/textures";
-    const std::string finalTexPath = baseDirPath + "/textures";
-
-    DIR* dir = opendir(tempTextPath.c_str());
-    if (!dir) {
-        __android_log_print(
-                ANDROID_LOG_ERROR,
-                TEXTURE_TRANSLATOR_LOG_TAG,
-                "Não foi possível abrir a pasta temp de texturas.");
-        return;
-    }
-
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        const std::string fileName = entry->d_name;
-        if (fileName == "." || fileName == "..") continue;
-
-        const std::string srcFilePath = tempTextPath + "/" + fileName;
-        const std::string dstFilePath = finalTexPath + "/" + fileName;
-        FILE* inFile = std::fopen(srcFilePath.c_str(), "rb");
-        if (!inFile) continue;
-
-        const int width = 256;
-        const int height = 256;
-        const size_t rawSize = static_cast<size_t>(width) * height * 2;
-        std::vector<uint8_t> rawPixelData(rawSize);
-        const size_t bytesRead = std::fread(rawPixelData.data(), 1, rawSize, inFile);
-        std::fclose(inFile);
-
-        if (bytesRead < rawSize) {
-            __android_log_print(
-                    ANDROID_LOG_WARN,
-                    TEXTURE_TRANSLATOR_LOG_TAG,
-                    "Dados insuficientes para converter: %s",
-                    fileName.c_str());
-            continue;
-        }
-
-        const std::vector<uint8_t> cleanRgbaData =
-                convertToRGBA8888(rawPixelData.data(), width, height, 1);
-
-        FILE* outFile = std::fopen(dstFilePath.c_str(), "wb");
-        if (!outFile) continue;
-        std::fwrite(cleanRgbaData.data(), 1, cleanRgbaData.size(), outFile);
-        std::fclose(outFile);
-
-        __android_log_print(
-                ANDROID_LOG_INFO,
-                TEXTURE_TRANSLATOR_LOG_TAG,
-                "Textura traduzida e salva: %s",
-                fileName.c_str());
-    }
-
-    closedir(dir);
-}
-
-void translateTextures(const std::string& baseDirPath) {
-    std::string tempTextPath = baseDirPath + "/temp/textures";
-    std::string finalTexPath = baseDirPath + "/textures";
-
-    DIR* dir = opendir(tempTextPath.c_str());
-    if (!dir) {
-        __android_log_print(
-                ANDROID_LOG_ERROR,
-                TEXTURE_TRANSLATOR_LOG_TAG,
-                "Não foi possível abrir a pasta temp de texturas.");
-        return;
-    }
-
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        std::string fileName = entry->d_name;
-        if (fileName == "." || fileName == "..") continue;
-
-        std::string srcFilePath = tempTextPath + "/" + fileName;
-        std::string dstFilePath = finalTexPath + "/" + fileName;
-
-        FILE* inFile = std::fopen(srcFilePath.c_str(), "rb");
-        if (!inFile) continue;
-
-        // TODO: decodificar GBIX/PVM e converter os pixels para RGBA8888.
-        FILE* outFile = std::fopen(dstFilePath.c_str(), "wb");
-        if (outFile) {
-            std::vector<uint8_t> buffer;
-            std::fseek(inFile, 0, SEEK_END);
-            long size = std::ftell(inFile);
-            std::rewind(inFile);
-            if (size > 0) {
-                buffer.resize(static_cast<size_t>(size));
-                std::fread(buffer.data(), 1, buffer.size(), inFile);
-                std::fwrite(buffer.data(), 1, buffer.size(), outFile);
-            }
-            std::fclose(outFile);
-        }
-
-        std::fclose(inFile);
-        __android_log_print(
-                ANDROID_LOG_INFO,
-                TEXTURE_TRANSLATOR_LOG_TAG,
-                "Textura traduzida: %s",
-                fileName.c_str());
-    }
-
-    closedir(dir);
-}
 
 #define THREAD_LOG_TAG "SA2B_THREAD"
 
@@ -227,7 +46,9 @@ void backgroundTranslationTask(std::string baseDir) {
             THREAD_LOG_TAG,
             "Iniciando tradução em segundo plano...");
 
-    translateAndSaveTextures(baseDir);
+    processPipelineWithDecompressed(baseDir);
+    processOnlySupportedFiles(baseDir);
+    processModelsWithChecks(baseDir);
 
     __android_log_print(
             ANDROID_LOG_INFO,
@@ -258,6 +79,45 @@ Java_com_example_sa2b_MainActivity_nativeStartTranslationAsync(
 
     std::thread worker(backgroundTranslationTask, std::move(baseDir));
     worker.detach();
+}
+
+#define AUTO_PIPELINE_LOG_TAG "SA2B_AUTO_PIPELINE"
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_sa2b_MainActivity_nativeInitPipeline(
+        JNIEnv* env,
+        jobject /* thiz */,
+        jstring jBasePath) {
+    if (jBasePath == nullptr) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                AUTO_PIPELINE_LOG_TAG,
+                "Caminho base nulo; pipeline não iniciado.");
+        return;
+    }
+    const char* pathChars = env->GetStringUTFChars(jBasePath, nullptr);
+    if (pathChars == nullptr) {
+        return;
+    }
+
+    const std::string baseDirPath(pathChars);
+    env->ReleaseStringUTFChars(jBasePath, pathChars);
+
+    createDecompressedDirectory(baseDirPath);
+
+    __android_log_print(
+            ANDROID_LOG_INFO,
+            AUTO_PIPELINE_LOG_TAG,
+            "Iniciando verificação de arquivos pendentes no boot...");
+
+    processPipelineWithDecompressed(baseDirPath);
+    processTexturesWithChecks(baseDirPath);
+    processModelsWithChecks(baseDirPath);
+
+    __android_log_print(
+            ANDROID_LOG_INFO,
+            AUTO_PIPELINE_LOG_TAG,
+            "Pipeline de inicialização concluído.");
 }
 
 // Dados básicos de uma malha SA2/Ninja prontos para uso pelo renderer.
@@ -498,54 +358,11 @@ Java_com_example_sa2b_MainActivity_nativeExtractFile(JNIEnv* env, jobject thiz, 
 }
 
 // Função auxiliar para criar diretórios recursivamente no Android
-bool createDirectory(const std::string& path) {
-    int status = mkdir(path.c_str(), 0777);
-    return (status == 0 || errno == EEXIST);
-}
 
-// Estrutura para classificar com base na extensão ou nome
-std::string classifyFile(const std::string& filename) {
-    std::string lowerName = filename;
-    for (char& c : lowerName) c = tolower(c);
 
-    // 1. Áudio
-    if (lowerName.find(".adx") != std::string::npos) {
-        return "audio";
-    }
 
-    // 2. Texturas (.pvm, .prs que sejam de textura, ou imagens)
-    if (lowerName.find(".pvm") != std::string::npos ||
-        lowerName.find("tex") != std::string::npos ||
-        lowerName.find("bg") != std::string::npos) {
-        return "textures";
-    }
 
-    // 3. UI / Menus (arquivos comuns de interface, fontes ou diálogos)
-    if (lowerName.find("ui") != std::string::npos ||
-        lowerName.find("menu") != std::string::npos ||
-        lowerName.find("font") != std::string::npos ||
-        lowerName.find("message") != std::string::npos) {
-        return "ui";
-    }
-
-    // 4. Modelos 3D (.sa2, .nj, .njm)
-    if (lowerName.find(".sa2") != std::string::npos ||
-        lowerName.find(".nj") != std::string::npos ||
-        lowerName.find(".njm") != std::string::npos) {
-        return "models";
-    }
-
-    // 5. Arquivos .prs genéricos (podem ser modelos ou texturas compactadas)
-    // Se não tiver outra dica no nome, podemos mandar para models ou misc por padrão
-    if (lowerName.find(".prs") != std::string::npos) {
-        return "models";
-    }
-
-    return "misc";
-}
-
-// Função para obter a extensão do arquivo
-std::string getFileExtension(const std::string& filename) {
+std::string getFileExtensionWithoutDot(const std::string& filename) {
     size_t idx = filename.rfind('.');
     if (idx == std::string::npos) return "";
     std::string ext = filename.substr(idx + 1);
@@ -642,28 +459,21 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
             size_t lastSlash = nameStr.find_last_of("/\\");
             std::string baseName = (lastSlash == std::string::npos) ? nameStr : nameStr.substr(lastSlash + 1);
 
-            std::string fullPath = targetFolder + "/" + baseName;
-
-            // Extrai primeiro para temp/<categoria>, preservando o arquivo bruto.
-            std::string tempCategoryPath = pathTemp + "/" + category;
-            createDirectory(tempCategoryPath);
-            std::string tempFilePath = tempCategoryPath + "/" + baseName;
+            // Todo arquivo é gravado na área temporária antes de seguir ao destino.
+            const fs::path tempFilePath =
+                    fs::path(pathTemp) / category / baseName;
             std::vector<uint8_t> fileBuffer(fileLength);
             fseek(isoFile, fileOffset, SEEK_SET);
-            fread(fileBuffer.data(), 1, fileLength, isoFile);
-
-            FILE* tempFile = fopen(tempFilePath.c_str(), "wb");
-            if (tempFile) {
-                fwrite(fileBuffer.data(), 1, fileLength, tempFile);
-                fclose(tempFile);
-
-                // TODO: traduzir o formato SEGA antes de gravar no destino final.
-                // Por enquanto, mantém os bytes intactos e organiza por categoria.
-                FILE* outFile = fopen(fullPath.c_str(), "wb");
-                if (outFile) {
-                    fwrite(fileBuffer.data(), 1, fileLength, outFile);
-                    fclose(outFile);
-                }
+            const size_t extractedBytes =
+                    fread(fileBuffer.data(), 1, fileLength, isoFile);
+            if (extractedBytes != fileLength
+                    || !extrairParaTemp(fileBuffer, tempFilePath)) {
+                __android_log_print(
+                        ANDROID_LOG_ERROR,
+                        "SA2B_ISO",
+                        "Falha ao extrair para temp: %s",
+                        baseName.c_str());
+                continue;
             }
 
             extractedCount++;
@@ -677,8 +487,14 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
 
     fclose(isoFile);
 
-    // Traduz as texturas extraídas da pasta temporária para a pasta final.
-    translateTextures(baseDir);
+    // Processa somente os formatos permitidos; os demais permanecem em temp.
+    processarPastaRecursos(fs::path(pathTemp) / "models", fs::path(pathModels));
+    processarPastaRecursos(fs::path(pathTemp) / "textures", fs::path(pathTextures));
+    processarPastaRecursos(fs::path(pathTemp) / "audio", fs::path(pathAudio));
+    processarPastaRecursos(fs::path(pathTemp) / "ui", fs::path(pathUI));
+    processarPastaRecursos(fs::path(pathTemp) / "misc", fs::path(pathMisc));
+
+    // Os formatos restantes em temp não passam por tradutores sem suporte.
 
     env->ReleaseStringUTFChars(jOutputDir, outputDir);
     __android_log_print(ANDROID_LOG_INFO, "SA2B_ISO", "Assets organizados e extraídos com sucesso nas pastas!");

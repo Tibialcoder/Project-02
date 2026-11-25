@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 3.22.1)
 project("sa2b_engine")
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 add_library(
         sa2b_engine
         SHARED
         native-lib.cpp
+        prs_decompressor.cpp
+        texture_translation.cpp
+        resource_file_manager.cpp
+        resource_pipeline.cpp
 )
 
 find_library(log-lib log)

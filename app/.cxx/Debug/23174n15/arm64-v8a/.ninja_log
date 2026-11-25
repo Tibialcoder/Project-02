@@ -1,47 +1,11 @@
 # ninja log v5
-2	791	8168327707862348	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-794	1119	8168327711253203	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-9	664	8168375742545583	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-665	1008	8168375746047992	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-16	732	8168403690078242	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-733	1086	8168403693679989	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-12	1328	8168436763554250	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1328	1699	8168436767387102	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-9	840	8168439851631471	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-841	1117	8168439854531068	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-3	1010	8168441631221929	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1010	1337	8168441634478661	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-23	1425	8168444756281911	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1426	1876	8168444760979085	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-5	1210	8168445419743116	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1211	1601	8168445423692197	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-5	1314	8168446595466209	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1315	1742	8168446599863025	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-4	1155	8168448296070759	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1156	1547	8168448300022737	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-3	1202	8168450497116238	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1203	1564	8168450500806218	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-4	1303	8168451897732312	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1304	1672	8168451901514706	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-5	1254	8168453448509225	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1255	1673	8168453453089088	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-4	1254	8168455952539208	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1255	1653	8168455956565809	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-7	1249	8168457135473724	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1250	1724	8168457140195760	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-7	1228	8168458241482359	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1229	1632	8168458245544188	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-7	2037	8168463893286573	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-2040	2431	8168463897485947	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-5	2016	8168479226415022	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-2017	2421	8168479230546706	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-6	3536	8168479371100915	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-3539	4065	8168479376781711	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-5	1284	8169182548876713	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1284	1647	8169182552602440	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-6	1266	8169187276985963	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1267	1517	8169187279585124	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-15	1190	8169204467096861	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1191	1463	8169204469975467	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-10	1454	8169248683329216	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
-1455	1906	8169248687928258	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
+13	2360	8170876316104939	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	c8a6e14af60c5510
+2361	2837	8170876320976829	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
+7	1813	8170884249663271	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+1814	2095	8170884252543245	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
+14	2270	8170903100815393	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+2271	2531	8170903103479784	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
+17	3306	8171748662428700	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+3307	3712	8171748666522214	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
+13	2364	8171755417663423	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+2365	2650	8171755420730551	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
