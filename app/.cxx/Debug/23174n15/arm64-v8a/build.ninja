@@ -56,6 +56,34 @@ build CMakeFiles/sa2b_engine.dir/native-lib.cpp.o: CXX_COMPILER__sa2b_engine_Deb
   OBJECT_DIR = CMakeFiles\sa2b_engine.dir
   OBJECT_FILE_DIR = CMakeFiles\sa2b_engine.dir
 
+build CMakeFiles/sa2b_engine.dir/prs_decompressor.cpp.o: CXX_COMPILER__sa2b_engine_Debug C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/src/main/cpp/prs_decompressor.cpp || cmake_object_order_depends_target_sa2b_engine
+  DEFINES = -Dsa2b_engine_EXPORTS
+  DEP_FILE = CMakeFiles\sa2b_engine.dir\prs_decompressor.cpp.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info  -fPIC -std=c++17
+  OBJECT_DIR = CMakeFiles\sa2b_engine.dir
+  OBJECT_FILE_DIR = CMakeFiles\sa2b_engine.dir
+
+build CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o: CXX_COMPILER__sa2b_engine_Debug C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/src/main/cpp/texture_translation.cpp || cmake_object_order_depends_target_sa2b_engine
+  DEFINES = -Dsa2b_engine_EXPORTS
+  DEP_FILE = CMakeFiles\sa2b_engine.dir\texture_translation.cpp.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info  -fPIC -std=c++17
+  OBJECT_DIR = CMakeFiles\sa2b_engine.dir
+  OBJECT_FILE_DIR = CMakeFiles\sa2b_engine.dir
+
+build CMakeFiles/sa2b_engine.dir/resource_file_manager.cpp.o: CXX_COMPILER__sa2b_engine_Debug C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/src/main/cpp/resource_file_manager.cpp || cmake_object_order_depends_target_sa2b_engine
+  DEFINES = -Dsa2b_engine_EXPORTS
+  DEP_FILE = CMakeFiles\sa2b_engine.dir\resource_file_manager.cpp.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info  -fPIC -std=c++17
+  OBJECT_DIR = CMakeFiles\sa2b_engine.dir
+  OBJECT_FILE_DIR = CMakeFiles\sa2b_engine.dir
+
+build CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o: CXX_COMPILER__sa2b_engine_Debug C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/src/main/cpp/resource_pipeline.cpp || cmake_object_order_depends_target_sa2b_engine
+  DEFINES = -Dsa2b_engine_EXPORTS
+  DEP_FILE = CMakeFiles\sa2b_engine.dir\resource_pipeline.cpp.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info  -fPIC -std=c++17
+  OBJECT_DIR = CMakeFiles\sa2b_engine.dir
+  OBJECT_FILE_DIR = CMakeFiles\sa2b_engine.dir
+
 
 # =============================================================================
 # Link build statements for SHARED_LIBRARY target sa2b_engine
@@ -64,7 +92,7 @@ build CMakeFiles/sa2b_engine.dir/native-lib.cpp.o: CXX_COMPILER__sa2b_engine_Deb
 #############################################
 # Link the shared library C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\cxx\Debug\23174n15\obj\arm64-v8a\libsa2b_engine.so
 
-build C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so: CXX_SHARED_LIBRARY_LINKER__sa2b_engine_Debug CMakeFiles/sa2b_engine.dir/native-lib.cpp.o | C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/liblog.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libandroid.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libGLESv3.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libEGL.so
+build C$:/Users/hiury/OneDrive/Documentos/Project$ 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so: CXX_SHARED_LIBRARY_LINKER__sa2b_engine_Debug CMakeFiles/sa2b_engine.dir/native-lib.cpp.o CMakeFiles/sa2b_engine.dir/prs_decompressor.cpp.o CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o CMakeFiles/sa2b_engine.dir/resource_file_manager.cpp.o CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o | C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/liblog.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libandroid.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libGLESv3.so C$:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libEGL.so
   LANGUAGE_COMPILE_FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fno-limit-debug-info
   LINK_FLAGS = -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--fatal-warnings -Wl,--gc-sections -Wl,--no-undefined -Qunused-arguments
   LINK_LIBRARIES = C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/liblog.so  C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libandroid.so  C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libGLESv3.so  C:/Users/hiury/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/24/libEGL.so  -latomic -lm

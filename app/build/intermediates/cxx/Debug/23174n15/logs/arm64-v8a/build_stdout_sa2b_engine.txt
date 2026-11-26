@@ -1,2 +1,4 @@
 ninja: Entering directory `C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\.cxx\Debug\23174n15\arm64-v8a'
-ninja: no work to do.
+[1/3] Building CXX object CMakeFiles/sa2b_engine.dir/native-lib.cpp.o
+[2/3] Building CXX object CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o
+[3/3] Linking CXX shared library "C:\Users\hiury\OneDrive\Documentos\Project 02\v0.1\Project-02-v0.1\app\build\intermediates\cxx\Debug\23174n15\obj\arm64-v8a\libsa2b_engine.so"

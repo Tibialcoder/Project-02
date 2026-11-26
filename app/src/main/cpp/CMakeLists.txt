@@ -12,6 +12,7 @@ add_library(
         texture_translation.cpp
         resource_file_manager.cpp
         resource_pipeline.cpp
+        pvm_parser.cpp
 )
 
 find_library(log-lib log)

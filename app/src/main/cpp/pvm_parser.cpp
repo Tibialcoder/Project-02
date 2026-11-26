@@ -1,9 +1,12 @@
-#include <vector>
-#include <string>
-#include <cstdint>
+#include "pvm_parser.h"
+
 #include <algorithm>
 #include <cstring>
+#include <fstream>
+#include <system_error>
 #include <android/log.h>
+
+namespace fs = std::filesystem;
 
 #define LOG_TAG "SA2B_Parser"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -26,14 +29,11 @@ struct PVMEntryHeader {
 };
 #pragma pack(pop)
 
-// Estrutura para armazenar a textura PVR extraída
-struct ExtractedTexture {
-    std::string name;
-    std::vector<uint8_t> pvrData;
-};
-
-// Função principal que desacopla o PVM nos PVRs internos
-bool ExtractPVMContainer(const std::vector<uint8_t>& pvmFileData, std::vector<ExtractedTexture>& outTextures) {
+// Extrai PVRs e, se solicitado, devolve a tabela para exportação JSON.
+static bool ExtractPVMContainerInternal(
+        const std::vector<uint8_t>& pvmFileData,
+        std::vector<ExtractedTexture>& outTextures,
+        std::vector<PVMTextureMetadata>* metadataOut) {
     if (pvmFileData.size() < sizeof(PVMHeader)) {
         LOGE("Erro: Arquivo PVM muito pequeno para conter um cabeçalho válido.");
         return false;
@@ -50,11 +50,7 @@ bool ExtractPVMContainer(const std::vector<uint8_t>& pvmFileData, std::vector<Ex
     LOGI("=== Lendo Container PVM ===");
     LOGI("Total de texturas encontradas no pacote: %u", header->entryCount);
 
-    struct TempEntryInfo {
-        std::string name;
-        uint32_t offset;
-    };
-    std::vector<TempEntryInfo> entriesList;
+    std::vector<PVMTextureMetadata> entriesList;
 
     const uint8_t* ptr = pvmFileData.data() + sizeof(PVMHeader);
     const uint8_t* endPtr = pvmFileData.data() + pvmFileData.size();
@@ -107,5 +103,106 @@ bool ExtractPVMContainer(const std::vector<uint8_t>& pvmFileData, std::vector<Ex
              extTex.name.c_str(), pvrSize);
     }
 
+    if (metadataOut != nullptr) {
+        *metadataOut = entriesList;
+    }
     return true;
+}
+
+bool ExtractPVMContainer(
+        const std::vector<uint8_t>& pvmFileData,
+        std::vector<ExtractedTexture>& outTextures) {
+    return ExtractPVMContainerInternal(pvmFileData, outTextures, nullptr);
+}
+
+static void writeJsonString(std::ofstream& output, const std::string& value) {
+    static constexpr char hexDigits[] = "0123456789abcdef";
+    output.put('"');
+    for (unsigned char ch : value) {
+        switch (ch) {
+            case '"': output << "\\\""; break;
+            case '\\': output << "\\\\"; break;
+            case '\b': output << "\\b"; break;
+            case '\f': output << "\\f"; break;
+            case '\n': output << "\\n"; break;
+            case '\r': output << "\\r"; break;
+            case '\t': output << "\\t"; break;
+            default:
+                if (ch < 0x20) {
+                    output << "\\u00"
+                           << hexDigits[(ch >> 4) & 0x0f]
+                           << hexDigits[ch & 0x0f];
+                } else {
+                    output.put(static_cast<char>(ch));
+                }
+        }
+    }
+    output.put('"');
+}
+
+bool SalvarPVMEmJSON(
+        const std::string& nomePVM,
+        const std::vector<PVMTextureMetadata>& entriesList,
+        const fs::path& pastaDestino) {
+    std::error_code error;
+    fs::create_directories(pastaDestino, error);
+    if (error) {
+        LOGE("Não foi possível criar a pasta de metadados: %s",
+             pastaDestino.string().c_str());
+        return false;
+    }
+
+    fs::path nomeJson = fs::path(nomePVM).filename();
+    if (nomeJson.extension() != ".json") {
+        nomeJson.replace_extension(".json");
+    }
+    const fs::path caminhoJson = pastaDestino / nomeJson;
+
+    std::ofstream arquivo(caminhoJson, std::ios::out | std::ios::trunc);
+    if (!arquivo.is_open()) {
+        LOGE("Erro ao criar o ficheiro JSON para o PVM: %s",
+             caminhoJson.string().c_str());
+        return false;
+    }
+
+    arquivo << "{\n  \"pvm_container\": ";
+    writeJsonString(arquivo, nomePVM);
+    arquivo << ",\n  \"total_textures\": " << entriesList.size()
+            << ",\n  \"textures\": [\n";
+
+    for (size_t i = 0; i < entriesList.size(); ++i) {
+        arquivo << "    {\n      \"index\": " << i
+                << ",\n      \"name\": ";
+        writeJsonString(arquivo, entriesList[i].name);
+        arquivo << ",\n      \"offset\": " << entriesList[i].offset
+                << "\n    }";
+        if (i + 1 < entriesList.size()) {
+            arquivo << ",";
+        }
+        arquivo << "\n";
+    }
+
+    arquivo << "  ]\n}\n";
+    arquivo.close();
+    if (!arquivo) {
+        LOGE("Falha ao terminar a gravação do JSON: %s",
+             caminhoJson.string().c_str());
+        return false;
+    }
+
+    LOGI("Metadados PVM salvos em JSON: %s",
+         caminhoJson.filename().string().c_str());
+    return true;
+}
+
+bool ExtractPVMContainer(
+        const std::vector<uint8_t>& pvmFileData,
+        std::vector<ExtractedTexture>& outTextures,
+        const std::string& nomePVM,
+        const fs::path& pastaDestino) {
+    std::vector<PVMTextureMetadata> entriesList;
+    if (!ExtractPVMContainerInternal(pvmFileData, outTextures, &entriesList)) {
+        return false;
+    }
+    return SalvarPVMEmJSON(nomePVM, entriesList, pastaDestino);
 }

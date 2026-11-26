@@ -13,6 +13,7 @@ bool extensaoPermitida(const std::filesystem::path& caminho);
 void processarPastaRecursos(
         const std::filesystem::path& pastaOrigem,
         const std::filesystem::path& pastaDefinitiva);
+void organizarBinariosParaTraducao(const std::string& baseDirPath);
 void processOnlySupportedFiles(const std::string& baseDirPath);
 bool modelFileExists(const std::string& path);
 void processModelsWithChecks(const std::string& baseDirPath);

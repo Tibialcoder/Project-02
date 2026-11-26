@@ -47,6 +47,7 @@ void backgroundTranslationTask(std::string baseDir) {
             "Iniciando tradução em segundo plano...");
 
     processPipelineWithDecompressed(baseDir);
+    organizarBinariosParaTraducao(baseDir);
     processOnlySupportedFiles(baseDir);
     processModelsWithChecks(baseDir);
 
@@ -111,6 +112,8 @@ Java_com_example_sa2b_MainActivity_nativeInitPipeline(
             "Iniciando verificação de arquivos pendentes no boot...");
 
     processPipelineWithDecompressed(baseDirPath);
+    organizarBinariosParaTraducao(baseDirPath);
+    processOnlySupportedFiles(baseDirPath);
     processTexturesWithChecks(baseDirPath);
     processModelsWithChecks(baseDirPath);
 
@@ -397,6 +400,7 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
     std::string pathAudio    = baseDir + "/audio";
     std::string pathUI       = baseDir + "/ui";
     std::string pathMisc     = baseDir + "/misc";
+    std::string pathBin      = baseDir + "/bin";
 
     createDirectory(baseDir);
     createDirectory(pathTemp);
@@ -405,6 +409,12 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
     createDirectory(pathAudio);
     createDirectory(pathUI);
     createDirectory(pathMisc);
+    createDirectory(pathBin);
+    createDirectory(pathBin + "/models");
+    createDirectory(pathBin + "/textures");
+    createDirectory(pathBin + "/audio");
+    createDirectory(pathBin + "/ui");
+    createDirectory(pathBin + "/misc");
 
     // Lê o cabeçalho e a FST
     std::vector<uint8_t> headerBuffer(2048);
@@ -494,7 +504,8 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
     processarPastaRecursos(fs::path(pathTemp) / "ui", fs::path(pathUI));
     processarPastaRecursos(fs::path(pathTemp) / "misc", fs::path(pathMisc));
 
-    // Os formatos restantes em temp não passam por tradutores sem suporte.
+    // Exporta metadados dos PVMs que ficaram pendentes em temp/textures.
+    processOnlySupportedFiles(baseDir);
 
     env->ReleaseStringUTFChars(jOutputDir, outputDir);
     __android_log_print(ANDROID_LOG_INFO, "SA2B_ISO", "Assets organizados e extraídos com sucesso nas pastas!");

@@ -249,6 +249,10 @@ void processTexturesWithChecks(const std::string& baseDirPath) {
     while ((entry = readdir(dir)) != nullptr) {
         const std::string fileName = entry->d_name;
         if (fileName == "." || fileName == "..") continue;
+        if (getFileExtension(fileName) == ".pvm") {
+            // O parser PVM exporta metadados JSON; não trate o container como pixels crus.
+            continue;
+        }
 
         const size_t lastDot = fileName.find_last_of('.');
         const std::string baseName = lastDot == std::string::npos

@@ -2,6 +2,7 @@
 #include "resource_file_manager.h"
 #include "prs_decompressor.h"
 #include "texture_translation.h"
+#include "pvm_parser.h"
 
 #include <android/log.h>
 #include <algorithm>
@@ -141,9 +142,14 @@ bool processarRecurso(
         return false;
     }
 
-    const fs::path caminhoFinal = pastaDefinitiva / nomeProcessado;
+    const bool recursoBinario = getFileExtension(nomeProcessado) == ".bin";
+    const fs::path pastaDestino = recursoBinario
+            ? pastaDefinitiva.parent_path() / "bin" / pastaDefinitiva.filename()
+            : pastaDefinitiva;
+    const fs::path caminhoFinal = pastaDestino / nomeProcessado;
+
     bool saved = false;
-    if (getFileExtension(nomeProcessado) == ".rgba"
+    if (!recursoBinario && getFileExtension(nomeProcessado) == ".rgba"
             && pastaDefinitiva.filename() == "textures") {
         saved = salvarRGBA(caminhoFinal.string(), dadosProcessados, 256, 256);
     } else {
@@ -251,6 +257,58 @@ void processarPastaRecursos(
     }
 }
 
+void organizarBinariosParaTraducao(const std::string& baseDirPath) {
+    const fs::path raiz(baseDirPath);
+    const std::vector<std::string> categorias = {
+            "models", "textures", "audio", "ui", "misc"
+    };
+
+    for (const std::string& categoria : categorias) {
+        const fs::path pastaOrigem = raiz / "temp" / categoria;
+        const fs::path pastaBin = raiz / "bin" / categoria;
+        std::error_code error;
+        fs::create_directories(pastaBin, error);
+        if (error) {
+            __android_log_print(
+                    ANDROID_LOG_ERROR,
+                    "SA2B_PIPELINE",
+                    "Não foi possível criar a pasta bin/%s.",
+                    categoria.c_str());
+            continue;
+        }
+
+        fs::directory_iterator entry(pastaOrigem, error);
+        const fs::directory_iterator end;
+        if (error) continue;
+
+        while (entry != end) {
+            const fs::path caminhoArquivo = entry->path();
+            std::error_code statusError;
+            if (fs::is_regular_file(caminhoArquivo, statusError)
+                    && getFileExtension(caminhoArquivo.filename().string()) == ".bin") {
+                const fs::path destino = pastaBin / caminhoArquivo.filename();
+                std::error_code copyError;
+                fs::copy_file(
+                        caminhoArquivo,
+                        destino,
+                        fs::copy_options::overwrite_existing,
+                        copyError);
+                if (copyError) {
+                    __android_log_print(
+                            ANDROID_LOG_ERROR,
+                            "SA2B_PIPELINE",
+                            "Falha ao colocar arquivo em bin/%s: %s",
+                            categoria.c_str(),
+                            caminhoArquivo.filename().string().c_str());
+                }
+            }
+
+            entry.increment(error);
+            if (error) break;
+        }
+    }
+}
+
 void processOnlySupportedFiles(const std::string& baseDirPath) {
     const std::string tempPath = baseDirPath + "/temp/textures";
     DIR* dir = opendir(tempPath.c_str());
@@ -268,13 +326,30 @@ void processOnlySupportedFiles(const std::string& baseDirPath) {
                 : fileName.substr(0, lastDot);
 
         if (extension == ".pvm") {
-            __android_log_print(
-                    ANDROID_LOG_INFO,
-                    SUPPORTED_PIPELINE_LOG_TAG,
-                    "PVM reconhecido para tradução: %s (base: %s)",
-                    fileName.c_str(),
-                    baseName.c_str());
-            // A extração do PVM ainda precisa ser ligada ao parser PVM neste target.
+            const std::string sourcePath = tempPath + "/" + fileName;
+            const std::vector<uint8_t> pvmData = lerArquivoBinario(sourcePath);
+            std::vector<ExtractedTexture> extractedTextures;
+            const fs::path metadataDirectory =
+                    fs::path(baseDirPath) / "textures";
+
+            if (pvmData.empty()
+                    || !ExtractPVMContainer(
+                            pvmData,
+                            extractedTextures,
+                            fileName,
+                            metadataDirectory)) {
+                __android_log_print(
+                        ANDROID_LOG_ERROR,
+                        SUPPORTED_PIPELINE_LOG_TAG,
+                        "Falha ao gerar JSON do PVM: %s",
+                        fileName.c_str());
+            } else {
+                __android_log_print(
+                        ANDROID_LOG_INFO,
+                        SUPPORTED_PIPELINE_LOG_TAG,
+                        "Metadados JSON do PVM gerados: %s",
+                        baseName.c_str());
+            }
         } else if (extension == ".sa2" || extension == ".nj") {
             __android_log_print(
                     ANDROID_LOG_INFO,
@@ -300,7 +375,18 @@ bool modelFileExists(const std::string& path) {
 
 void processModelsWithChecks(const std::string& baseDirPath) {
     const std::string tempModelsPath = baseDirPath + "/temp/models";
-    const std::string finalModelsPath = baseDirPath + "/models";
+    const std::string finalModelsPath = baseDirPath + "/bin/models";
+
+    std::error_code directoryError;
+    fs::create_directories(finalModelsPath, directoryError);
+    if (directoryError) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                MODEL_PIPELINE_LOG_TAG,
+                "Não foi possível criar a pasta de binários: %s",
+                finalModelsPath.c_str());
+        return;
+    }
 
     DIR* dir = opendir(tempModelsPath.c_str());
     if (!dir) {
