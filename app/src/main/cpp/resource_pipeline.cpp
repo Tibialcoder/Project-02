@@ -7,6 +7,7 @@
 #include <android/log.h>
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <dirent.h>
 #include <fstream>
@@ -16,6 +17,126 @@
 namespace fs = std::filesystem;
 #define MODEL_PIPELINE_LOG_TAG "SA2B_MODEL_PIPELINE"
 #define SUPPORTED_PIPELINE_LOG_TAG "SA2B"
+
+static uint32_t readBigEndian32(const uint8_t* data) {
+    return (static_cast<uint32_t>(data[0]) << 24u)
+            | (static_cast<uint32_t>(data[1]) << 16u)
+            | (static_cast<uint32_t>(data[2]) << 8u)
+            | static_cast<uint32_t>(data[3]);
+}
+
+static void writeJsonString(std::ofstream& output, const std::string& value) {
+    output.put('"');
+    for (unsigned char ch : value) {
+        switch (ch) {
+            case '"': output << "\\\""; break;
+            case '\\': output << "\\\\"; break;
+            case '\n': output << "\\n"; break;
+            case '\r': output << "\\r"; break;
+            case '\t': output << "\\t"; break;
+            default:
+                if (ch < 0x20) {
+                    output << "\\u00";
+                    static constexpr char digits[] = "0123456789abcdef";
+                    output.put(digits[(ch >> 4u) & 0x0f]);
+                    output.put(digits[ch & 0x0f]);
+                } else {
+                    output.put(static_cast<char>(ch));
+                }
+        }
+    }
+    output.put('"');
+}
+
+static bool exportTextBankJson(
+        const std::vector<uint8_t>& data,
+        const std::string& fileName,
+        const fs::path& outputDirectory) {
+    if (data.size() < 4) return false;
+
+    const uint32_t tableSize = readBigEndian32(data.data());
+    if (tableSize < 4 || tableSize > data.size() || tableSize % 4 != 0) {
+        __android_log_print(
+                ANDROID_LOG_WARN,
+                SUPPORTED_PIPELINE_LOG_TAG,
+                "Tabela de offsets inválida no banco de texto: %s",
+                fileName.c_str());
+        return false;
+    }
+
+    const size_t entryCount = tableSize / 4;
+    std::vector<uint32_t> offsets(entryCount);
+    for (size_t index = 0; index < entryCount; ++index) {
+        offsets[index] = readBigEndian32(data.data() + index * 4);
+        if (offsets[index] < tableSize || offsets[index] > data.size()) {
+            __android_log_print(
+                    ANDROID_LOG_WARN,
+                    SUPPORTED_PIPELINE_LOG_TAG,
+                    "Offset inválido no banco de texto %s, entrada %zu",
+                    fileName.c_str(),
+                    index);
+            return false;
+        }
+    }
+
+    std::error_code error;
+    fs::create_directories(outputDirectory, error);
+    if (error) return false;
+
+    fs::path jsonName(fileName);
+    jsonName.replace_extension(".json");
+    const fs::path jsonPath = outputDirectory / jsonName;
+    std::ofstream output(jsonPath, std::ios::out | std::ios::trunc);
+    if (!output.is_open()) return false;
+
+    output << "{\n  \"source\": ";
+    writeJsonString(output, fileName);
+    output << ",\n  \"entries\": [\n";
+
+    for (size_t index = 0; index < entryCount; ++index) {
+        const size_t start = offsets[index];
+        size_t end = data.size();
+        for (size_t next = index + 1; next < entryCount; ++next) {
+            if (offsets[next] > start) {
+                end = offsets[next];
+                break;
+            }
+        }
+
+        std::string text;
+        if (start < end) {
+            size_t textStart = start;
+            size_t textLength = end - start;
+            const size_t declaredLength = data[start];
+            if (declaredLength > 0 && declaredLength <= textLength - 1) {
+                textStart = start + 1;
+                textLength = declaredLength;
+            }
+
+            for (size_t position = textStart;
+                    position < textStart + textLength && position < data.size();
+                    ++position) {
+                const uint8_t ch = data[position];
+                if (ch == 0) break;
+                if (ch >= 0x20 || ch == '\t') {
+                    text.push_back(static_cast<char>(ch));
+                }
+            }
+        }
+
+        output << "    {\n      \"index\": " << index
+               << ",\n      \"offset\": " << offsets[index]
+               << ",\n      \"text\": ";
+        writeJsonString(output, text);
+        output << ",\n      \"translation\": \"\"\n    }";
+        if (index + 1 < entryCount) output << ",";
+        output << "\n";
+    }
+
+    output << "  ]\n}\n";
+    output.close();
+    return output.good();
+}
 
 bool temTradutor(const fs::path& caminho) {
     // A descompressão PRS é o tradutor disponível neste pipeline.
@@ -107,6 +228,43 @@ bool processarRecurso(
         return false;
     }
 
+    std::string nomeMinusculo = nomeFicheiro;
+    std::transform(
+            nomeMinusculo.begin(),
+            nomeMinusculo.end(),
+            nomeMinusculo.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+    // Texlists compactados são exportados diretamente como JSON; não viram .bin.
+    if (extensao == ".prs"
+            && pastaDefinitiva.filename() == "textures"
+            && nomeMinusculo.find("texlist") != std::string::npos) {
+        std::vector<ExtractedTexture> extractedTextures;
+        const std::string nomeSemExtensao =
+                fs::path(nomeFicheiro).stem().string();
+        if (!ExtractPVMContainer(
+                    dadosProcessados,
+                    extractedTextures,
+                    nomeSemExtensao,
+                    pastaDefinitiva)) {
+            __android_log_print(
+                    ANDROID_LOG_ERROR,
+                    "SA2B_PIPELINE",
+                    "Não foi possível gerar JSON do texlist: %s",
+                    nomeFicheiro.c_str());
+            return false;
+        }
+
+        std::error_code removeError;
+        fs::remove(caminhoOriginal, removeError);
+        __android_log_print(
+                ANDROID_LOG_INFO,
+                "SA2B_PIPELINE",
+                "Texlist exportado para JSON: %s",
+                nomeSemExtensao.c_str());
+        return true;
+    }
+
     if (!temTradutor(caminhoOriginal) && extensao != ".rgba") {
         __android_log_print(
                 ANDROID_LOG_DEBUG,
@@ -120,11 +278,10 @@ bool processarRecurso(
         const size_t lastDot = nomeProcessado.find_last_of('.');
         nomeProcessado = nomeProcessado.substr(0, lastDot);
 
-        // PRS é a compressão, não necessariamente a extensão do conteúdo.
-        // Preserva extensões internas (por exemplo, arquivo.pak.prs) e usa
-        // .bin como extensão neutra quando o nome original não informa o formato.
+        // O PRS é apenas a compressão; se o nome não informa o formato,
+        // classifica o payload pelo cabeçalho real.
         if (fs::path(nomeProcessado).extension().empty()) {
-            nomeProcessado += ".bin";
+            nomeProcessado += inferResourceExtension(dadosProcessados);
         }
     }
 
@@ -142,16 +299,30 @@ bool processarRecurso(
         return false;
     }
 
-    const bool recursoBinario = getFileExtension(nomeProcessado) == ".bin";
+    const std::string processadaExtension = getFileExtension(nomeProcessado);
+    const bool recursoBinario = processadaExtension == ".bin";
+    const bool texturaRgbaCrua = !recursoBinario
+            && processadaExtension == ".rgba"
+            && pastaDefinitiva.filename() == "textures";
+    const bool texturaParaConversao =
+            pastaDefinitiva.filename() == "textures"
+            && (processadaExtension == ".gvm"
+                    || processadaExtension == ".pvm"
+                    || processadaExtension == ".gvr"
+                    || processadaExtension == ".pvr");
     const fs::path pastaDestino = recursoBinario
             ? pastaDefinitiva.parent_path() / "bin" / pastaDefinitiva.filename()
-            : pastaDefinitiva;
-    const fs::path caminhoFinal = pastaDestino / nomeProcessado;
+            : (texturaParaConversao ? pastaTemp : pastaDefinitiva);
+    const std::string nomeDestino = texturaRgbaCrua
+            ? fs::path(nomeProcessado).stem().string() + ".tga"
+            : nomeProcessado;
+    const fs::path caminhoFinal = pastaDestino / nomeDestino;
 
     bool saved = false;
-    if (!recursoBinario && getFileExtension(nomeProcessado) == ".rgba"
-            && pastaDefinitiva.filename() == "textures") {
-        saved = salvarRGBA(caminhoFinal.string(), dadosProcessados, 256, 256);
+    if (caminhoFinal == caminhoTemp) {
+        saved = true;
+    } else if (texturaRgbaCrua) {
+        saved = salvarTGA(caminhoFinal.string(), dadosProcessados, 256, 256);
     } else {
         std::error_code copyError;
         fs::create_directories(caminhoFinal.parent_path(), copyError);
@@ -260,7 +431,7 @@ void processarPastaRecursos(
 void organizarBinariosParaTraducao(const std::string& baseDirPath) {
     const fs::path raiz(baseDirPath);
     const std::vector<std::string> categorias = {
-            "models", "textures", "audio", "ui", "misc"
+            "models", "textures", "audio", "misc"
     };
 
     for (const std::string& categoria : categorias) {
@@ -309,63 +480,259 @@ void organizarBinariosParaTraducao(const std::string& baseDirPath) {
     }
 }
 
-void processOnlySupportedFiles(const std::string& baseDirPath) {
-    const std::string tempPath = baseDirPath + "/temp/textures";
-    DIR* dir = opendir(tempPath.c_str());
-    if (!dir) return;
+static void moveLegacyUiFilesToTextures(const std::string& baseDirPath) {
+    const fs::path textureDirectory = fs::path(baseDirPath) / "temp/textures";
+    const std::vector<fs::path> legacyUiDirectories = {
+            fs::path(baseDirPath) / "temp/ui",
+            fs::path(baseDirPath) / "bin/ui",
+            fs::path(baseDirPath) / "ui"
+    };
 
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        const std::string fileName = entry->d_name;
-        if (fileName == "." || fileName == "..") continue;
+    std::error_code error;
+    fs::create_directories(textureDirectory, error);
+    if (error) return;
 
-        const std::string extension = getFileExtension(fileName);
-        const size_t lastDot = fileName.find_last_of('.');
-        const std::string baseName = lastDot == std::string::npos
-                ? fileName
-                : fileName.substr(0, lastDot);
+    for (const fs::path& sourceDirectory : legacyUiDirectories) {
+        error.clear();
+        fs::directory_iterator entry(sourceDirectory, error);
+        if (error) continue;
 
-        if (extension == ".pvm") {
-            const std::string sourcePath = tempPath + "/" + fileName;
-            const std::vector<uint8_t> pvmData = lerArquivoBinario(sourcePath);
-            std::vector<ExtractedTexture> extractedTextures;
-            const fs::path metadataDirectory =
-                    fs::path(baseDirPath) / "textures";
+        const fs::directory_iterator end;
+        while (entry != end) {
+            const fs::path sourceFile = entry->path();
+            std::error_code statusError;
+            if (fs::is_regular_file(sourceFile, statusError) && !statusError) {
+                fs::path destination = textureDirectory / sourceFile.filename();
+                const std::string stem = sourceFile.stem().string();
+                const std::string extension = sourceFile.extension().string();
+                for (uint32_t suffix = 1; fs::exists(destination, statusError); ++suffix) {
+                    statusError.clear();
+                    std::string uniqueName = stem;
+                    uniqueName += "_ui_";
+                    uniqueName += std::to_string(suffix);
+                    uniqueName += extension;
+                    destination = textureDirectory / uniqueName;
+                }
 
-            if (pvmData.empty()
-                    || !ExtractPVMContainer(
-                            pvmData,
-                            extractedTextures,
-                            fileName,
-                            metadataDirectory)) {
-                __android_log_print(
-                        ANDROID_LOG_ERROR,
-                        SUPPORTED_PIPELINE_LOG_TAG,
-                        "Falha ao gerar JSON do PVM: %s",
-                        fileName.c_str());
-            } else {
-                __android_log_print(
-                        ANDROID_LOG_INFO,
-                        SUPPORTED_PIPELINE_LOG_TAG,
-                        "Metadados JSON do PVM gerados: %s",
-                        baseName.c_str());
+                error.clear();
+                fs::rename(sourceFile, destination, error);
+                if (error) {
+                    error.clear();
+                    fs::copy_file(sourceFile, destination, error);
+                    if (!error) {
+                        std::error_code removeError;
+                        fs::remove(sourceFile, removeError);
+                    }
+                }
             }
-        } else if (extension == ".sa2" || extension == ".nj") {
-            __android_log_print(
-                    ANDROID_LOG_INFO,
-                    SUPPORTED_PIPELINE_LOG_TAG,
-                    "Modelo reconhecido: %s",
-                    fileName.c_str());
-        } else {
-            __android_log_print(
-                    ANDROID_LOG_DEBUG,
-                    SUPPORTED_PIPELINE_LOG_TAG,
-                    "Ignorando arquivo sem tradutor: %s",
-                    fileName.c_str());
+
+            entry.increment(error);
+            if (error) break;
+        }
+
+        error.clear();
+        fs::remove(sourceDirectory, error); // Remove apenas se estiver vazia.
+    }
+}
+
+void processOnlySupportedFiles(const std::string& baseDirPath) {
+    moveLegacyUiFilesToTextures(baseDirPath);
+
+    const std::vector<fs::path> sourceDirectories = {
+            fs::path(baseDirPath) / "temp/textures",
+            fs::path(baseDirPath) / "bin/textures",
+            fs::path(baseDirPath) / "temp/misc",
+            fs::path(baseDirPath) / "bin/misc"
+    };
+    std::vector<fs::path> sourceFiles;
+
+    for (const fs::path& directory : sourceDirectories) {
+        std::error_code iterationError;
+        fs::directory_iterator entry(directory, iterationError);
+        const fs::directory_iterator end;
+        if (iterationError) continue;
+
+        while (entry != end) {
+            std::error_code statusError;
+            if (entry->is_regular_file(statusError)) {
+                sourceFiles.push_back(entry->path());
+            }
+            entry.increment(iterationError);
+            if (iterationError) break;
         }
     }
 
-    closedir(dir);
+    const fs::path finalTextureDirectory = fs::path(baseDirPath) / "textures";
+    for (const fs::path& sourcePath : sourceFiles) {
+        std::error_code existsError;
+        if (!fs::exists(sourcePath, existsError) || existsError) continue;
+
+        const std::string fileName = sourcePath.filename().string();
+        const std::string extension = getFileExtension(fileName);
+        std::string lowerName = fileName;
+        std::transform(
+                lowerName.begin(),
+                lowerName.end(),
+                lowerName.begin(),
+                [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+        const fs::path tempTextureDirectory =
+                fs::path(baseDirPath) / "temp/textures";
+        if (extension == ".gvr" || extension == ".pvr") {
+            if (sourcePath.parent_path() != tempTextureDirectory) {
+                const std::vector<uint8_t> textureData =
+                        lerArquivoBinario(sourcePath.string());
+                const fs::path stagedTexture =
+                        tempTextureDirectory / sourcePath.filename();
+                if (!textureData.empty()
+                        && extrairParaTemp(textureData, stagedTexture)) {
+                    std::error_code removeError;
+                    fs::remove(sourcePath, removeError);
+                }
+            }
+            continue;
+        }
+
+        const bool isPvm = extension == ".pvm";
+        const bool isGvm = extension == ".gvm";
+        const bool isTextBankBin =
+                extension == ".bin" && lowerName.rfind("text_", 0) == 0;
+        const bool isTextureListBin =
+                extension == ".bin" && lowerName.find("texlist") != std::string::npos;
+
+        if (isTextBankBin) {
+            const std::vector<uint8_t> textBank =
+                    lerArquivoBinario(sourcePath.string());
+            if (exportTextBankJson(
+                        textBank,
+                        sourcePath.filename().string(),
+                        finalTextureDirectory)) {
+                std::error_code removeError;
+                fs::remove(sourcePath, removeError);
+                for (const fs::path& directory : sourceDirectories) {
+                    if (directory == sourcePath.parent_path()) continue;
+                    removeError.clear();
+                    fs::remove(directory / sourcePath.filename(), removeError);
+                }
+            }
+            continue;
+        }
+
+        if (extension == ".bin" && !isTextureListBin) {
+            const std::vector<uint8_t> binaryData =
+                    lerArquivoBinario(sourcePath.string());
+            uint32_t width = 0;
+            uint32_t height = 0;
+            uint8_t pixelFormat = 0;
+            uint8_t dataFormat = 0;
+            uint8_t textureFlags = 0;
+            bool isGvr = false;
+            size_t pixelDataOffset = 0;
+            if (readPVRDimensions(
+                        binaryData,
+                        width,
+                        height,
+                        pixelFormat,
+                        dataFormat,
+                        textureFlags,
+                        isGvr,
+                        pixelDataOffset)) {
+                const std::string textureExtension =
+                        inferResourceExtension(binaryData);
+                const fs::path stagedTexture =
+                        fs::path(baseDirPath) / "temp/textures"
+                        / (sourcePath.stem().string() + textureExtension);
+                if (extrairParaTemp(binaryData, stagedTexture)) {
+                    std::error_code removeError;
+                    fs::remove(sourcePath, removeError);
+                    continue;
+                }
+            }
+        }
+
+        if (!isPvm && !isGvm && !isTextureListBin) {
+            __android_log_print(
+                    ANDROID_LOG_DEBUG,
+                    SUPPORTED_PIPELINE_LOG_TAG,
+                    "Ignorando arquivo binário sem cabeçalho de textura: %s",
+                    fileName.c_str());
+            continue;
+        }
+
+        const std::vector<uint8_t> containerData =
+                lerArquivoBinario(sourcePath.string());
+        std::vector<ExtractedTexture> extractedTextures;
+        const bool containerParsed = !containerData.empty()
+                && ExtractPVMContainer(
+                        containerData,
+                        extractedTextures,
+                        sourcePath.stem().string(),
+                        finalTextureDirectory);
+        if (!containerParsed || (isGvm && extractedTextures.empty())) {
+            __android_log_print(
+                    ANDROID_LOG_ERROR,
+                    SUPPORTED_PIPELINE_LOG_TAG,
+                    "Falha ao gerar JSON do texlist/container: %s",
+                    fileName.c_str());
+            continue;
+        }
+
+        // Materializa cada GVRT/PVRT na pasta temporária. A etapa
+        // processTexturesWithChecks() converte esses arquivos para .tga.
+        bool extractedSuccessfully = true;
+        for (size_t index = 0; index < extractedTextures.size(); ++index) {
+            std::string textureName = fs::path(
+                    extractedTextures[index].name).filename().string();
+            if (textureName.empty() || textureName == "." || textureName == "..") {
+                textureName = "texture_" + std::to_string(index);
+            }
+            if (fs::path(textureName).extension().empty()) {
+                textureName += inferResourceExtension(
+                        extractedTextures[index].pvrData);
+            }
+
+            // Texturas extraídas de containers (inclusive GVMs em misc)
+            // devem entrar no diretório consumido pelo tradutor na mesma execução.
+            const fs::path extractedPath =
+                    fs::path(baseDirPath) / "temp/textures" / textureName;
+            if (!extrairParaTemp(
+                        extractedTextures[index].pvrData,
+                        extractedPath)) {
+                extractedSuccessfully = false;
+                __android_log_print(
+                        ANDROID_LOG_ERROR,
+                        SUPPORTED_PIPELINE_LOG_TAG,
+                        "Falha ao materializar textura extraída: %s",
+                        extractedPath.string().c_str());
+            }
+        }
+
+        if (!extractedSuccessfully) continue;
+
+        __android_log_print(
+                ANDROID_LOG_INFO,
+                SUPPORTED_PIPELINE_LOG_TAG,
+                "Container PVM/GVM extraído para conversão RGBA: %s",
+                fileName.c_str());
+
+        std::error_code removeError;
+        fs::remove(sourcePath, removeError);
+        if (removeError) {
+            __android_log_print(
+                    ANDROID_LOG_WARN,
+                    SUPPORTED_PIPELINE_LOG_TAG,
+                    "Texturas extraídas, mas não foi possível remover o container: %s",
+                    sourcePath.string().c_str());
+        }
+
+        if (isTextureListBin) {
+            for (const fs::path& directory : sourceDirectories) {
+                if (directory == sourcePath.parent_path()) continue;
+                removeError.clear();
+                fs::remove(directory / sourcePath.filename(), removeError);
+            }
+        }
+    }
 }
 
 bool modelFileExists(const std::string& path) {
@@ -373,7 +740,9 @@ bool modelFileExists(const std::string& path) {
     return stat(path.c_str(), &fileStatus) == 0;
 }
 
-void processModelsWithChecks(const std::string& baseDirPath) {
+void processModelsWithChecks(
+        const std::string& baseDirPath,
+        const std::function<void()>& onFileTranslated) {
     const std::string tempModelsPath = baseDirPath + "/temp/models";
     const std::string finalModelsPath = baseDirPath + "/bin/models";
 
@@ -416,6 +785,7 @@ void processModelsWithChecks(const std::string& baseDirPath) {
                     "Modelo já processado. Limpando temporário: %s",
                     fileName.c_str());
             std::remove(srcFilePath.c_str());
+            if (onFileTranslated) onFileTranslated();
             continue;
         }
 
@@ -465,6 +835,7 @@ void processModelsWithChecks(const std::string& baseDirPath) {
                         "Modelo bruto removido da temp: %s",
                         fileName.c_str());
             }
+            if (onFileTranslated) onFileTranslated();
         }
     }
 

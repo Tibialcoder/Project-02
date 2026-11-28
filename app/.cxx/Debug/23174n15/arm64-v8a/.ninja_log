@@ -1,12 +1,26 @@
 # ninja log v5
-13	2364	8171755417663423	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
-2365	2650	8171755420730551	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	a788ef6a3ef0e9cb
-51	1589	8173508101093217	CMakeFiles/sa2b_engine.dir/resource_file_manager.cpp.o	beaabbbf7aa636fd
-23	1998	8173508105371739	CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o	2a7603a37a8a61f5
-35	2008	8173508105436988	CMakeFiles/sa2b_engine.dir/prs_decompressor.cpp.o	4e59bab84efaaffe
-43	2249	8173508107938524	CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o	6b35ae779fba793b
-8	2464	8173508110013791	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
-2464	2888	8173508114141250	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	42d4bea073c9e279
-14	1333	8173514182463443	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
-42	1360	8173514182801707	CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o	6b35ae779fba793b
-1360	1648	8173514185718750	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	42d4bea073c9e279
+9	1848	8174477674572657	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+1848	2295	8174477679228832	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	1b68556fabe8ba86
+56	2021	8174098622505251	CMakeFiles/sa2b_engine.dir/resource_file_manager.cpp.o	beaabbbf7aa636fd
+118	3912	8174377086718563	CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o	2a7603a37a8a61f5
+39	2924	8174150024686493	CMakeFiles/sa2b_engine.dir/prs_decompressor.cpp.o	4e59bab84efaaffe
+76	3662	8174150032152745	CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o	6b35ae779fba793b
+9	3059	8174331403547986	CMakeFiles/sa2b_engine.dir/pvm_parser.cpp.o	a12f5ee247fa769d
+39	752	8175259064656521	CMakeFiles/sa2b_engine.dir/gvr_parser.cpp.o	d463d55f23ba8be
+10	1224	8175259069416541	CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o	2a7603a37a8a61f5
+50	1997	8175259077126554	CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o	6b35ae779fba793b
+25	2074	8175259077896509	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+2074	2431	8175259081432035	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	62df0047366a7998
+13	2419	8175269572257399	CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o	6b35ae779fba793b
+2420	2750	8175269575509413	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	62df0047366a7998
+31	817	8175284763114405	CMakeFiles/sa2b_engine.dir/gvr_parser.cpp.o	d463d55f23ba8be
+4	1252	8175284767533404	CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o	2a7603a37a8a61f5
+1252	1523	8175284770175218	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	62df0047366a7998
+11	825	8175293025442244	CMakeFiles/sa2b_engine.dir/gvr_parser.cpp.o	d463d55f23ba8be
+825	1119	8175293028338831	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	62df0047366a7998
+75	1234	8175307134580805	CMakeFiles/sa2b_engine.dir/resource_file_manager.cpp.o	beaabbbf7aa636fd
+10	1406	8175307136424396	CMakeFiles/sa2b_engine.dir/texture_translation.cpp.o	2a7603a37a8a61f5
+28	1594	8175307138300845	CMakeFiles/sa2b_engine.dir/prs_decompressor.cpp.o	4e59bab84efaaffe
+59	2195	8175307144255194	CMakeFiles/sa2b_engine.dir/resource_pipeline.cpp.o	6b35ae779fba793b
+42	2247	8175307144565562	CMakeFiles/sa2b_engine.dir/native-lib.cpp.o	b27af0bb27bcbe71
+2247	2559	8175307147910615	C:/Users/hiury/OneDrive/Documentos/Project 02/v0.1/Project-02-v0.1/app/build/intermediates/cxx/Debug/23174n15/obj/arm64-v8a/libsa2b_engine.so	62df0047366a7998

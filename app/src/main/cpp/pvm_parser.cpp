@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <system_error>
 #include <android/log.h>
 
@@ -29,6 +30,34 @@ struct PVMEntryHeader {
 };
 #pragma pack(pop)
 
+static uint32_t readLittleEndian32(const uint8_t* data) {
+    return static_cast<uint32_t>(data[0])
+            | (static_cast<uint32_t>(data[1]) << 8u)
+            | (static_cast<uint32_t>(data[2]) << 16u)
+            | (static_cast<uint32_t>(data[3]) << 24u);
+}
+
+static bool findGvrGlobalChunkStart(
+        const std::vector<uint8_t>& data,
+        size_t gvrtOffset,
+        size_t& chunkStart) {
+    const size_t searchStart = gvrtOffset > 256u ? gvrtOffset - 256u : 0u;
+    for (size_t candidate = searchStart;
+            candidate + 8u <= gvrtOffset; ++candidate) {
+        const bool isGbix = std::memcmp(data.data() + candidate, "GBIX", 4) == 0;
+        const bool isGcix = std::memcmp(data.data() + candidate, "GCIX", 4) == 0;
+        if (!isGbix && !isGcix) continue;
+
+        const uint32_t chunkSize = readLittleEndian32(data.data() + candidate + 4u);
+        if (chunkSize >= 8u
+                && static_cast<size_t>(chunkSize) == gvrtOffset - candidate - 8u) {
+            chunkStart = candidate;
+            return true;
+        }
+    }
+    return false;
+}
+
 // Extrai PVRs e, se solicitado, devolve a tabela para exportação JSON.
 static bool ExtractPVMContainerInternal(
         const std::vector<uint8_t>& pvmFileData,
@@ -41,13 +70,107 @@ static bool ExtractPVMContainerInternal(
 
     const PVMHeader* header = reinterpret_cast<const PVMHeader*>(pvmFileData.data());
 
-    // Verifica se o magic bate (ex: "PVM")
-    if (header->magic[0] != 'P' && header->magic[0] != 'p') {
-        LOGW("Aviso: Assinatura do PVM não convencional ('%c%c%c'). Tentando ler assim mesmo...",
-             header->magic[0], header->magic[1], header->magic[2]);
+    const bool isPvm = std::memcmp(header->magic, "PVMH", 4) == 0
+            || std::memcmp(header->magic, "PVM\0", 4) == 0
+            || std::memcmp(header->magic, "PVLS", 4) == 0;
+    const bool isGvm = std::memcmp(header->magic, "GVMH", 4) == 0;
+    if (!isPvm && !isGvm) {
+        LOGW("Assinatura de container não convencional ('%c%c%c%c'). Tentando ler assim mesmo...",
+             header->magic[0], header->magic[1],
+             header->magic[2], header->magic[3]);
     }
 
-    LOGI("=== Lendo Container PVM ===");
+    LOGI("=== Lendo Container PVM/GVM ===");
+
+    // GVM não possui necessariamente a mesma tabela de entradas do PVM.
+    // Localiza os blocos GVRT/PVRT diretamente para não salvar o container
+    // como um recurso final quando a tabela variar entre versões do jogo.
+    if (isGvm) {
+        std::vector<size_t> textureOffsets;
+        std::vector<const char*> textureMagics;
+        for (size_t offset = sizeof(PVMHeader); offset + 4 <= pvmFileData.size(); ++offset) {
+            const char* magic = reinterpret_cast<const char*>(
+                    pvmFileData.data() + offset);
+            if (std::memcmp(magic, "GVRT", 4) == 0) {
+                textureOffsets.push_back(offset);
+                textureMagics.push_back("GVRT");
+            } else if (std::memcmp(magic, "PVRT", 4) == 0) {
+                textureOffsets.push_back(offset);
+                textureMagics.push_back("PVRT");
+            }
+        }
+
+        std::vector<size_t> textureChunkStarts(textureOffsets);
+        std::vector<bool> hasGlobalChunk(textureOffsets.size(), false);
+        for (size_t index = 0; index < textureOffsets.size(); ++index) {
+            if (std::strcmp(textureMagics[index], "GVRT") == 0) {
+                size_t globalChunkStart = 0;
+                if (findGvrGlobalChunkStart(
+                            pvmFileData,
+                            textureOffsets[index],
+                            globalChunkStart)) {
+                    textureChunkStarts[index] = globalChunkStart;
+                    hasGlobalChunk[index] = true;
+                }
+            }
+        }
+
+        for (size_t index = 0; index < textureOffsets.size(); ++index) {
+            const size_t textureStart = textureOffsets[index];
+            const size_t startOffset = textureChunkStarts[index];
+            const size_t endOffset = index + 1 < textureOffsets.size()
+                    ? textureChunkStarts[index + 1]
+                    : pvmFileData.size();
+            if (endOffset <= textureStart) continue;
+
+            ExtractedTexture texture;
+            const bool isGvrTexture =
+                    std::strcmp(textureMagics[index], "GVRT") == 0;
+            texture.name = "texture_" + std::to_string(index)
+                    + (isGvrTexture ? ".gvr" : ".pvr");
+
+            if (isGvrTexture && !hasGlobalChunk[index]) {
+                static const uint8_t emptyGcix[16] = {
+                        'G', 'C', 'I', 'X', 8, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0
+                };
+                texture.pvrData.insert(
+                        texture.pvrData.end(),
+                        std::begin(emptyGcix),
+                        std::end(emptyGcix));
+                texture.pvrData.insert(
+                        texture.pvrData.end(),
+                        pvmFileData.begin()
+                                + static_cast<std::ptrdiff_t>(textureStart),
+                        pvmFileData.begin()
+                                + static_cast<std::ptrdiff_t>(endOffset));
+            } else {
+                texture.pvrData.assign(
+                        pvmFileData.begin()
+                                + static_cast<std::ptrdiff_t>(startOffset),
+                        pvmFileData.begin()
+                                + static_cast<std::ptrdiff_t>(endOffset));
+            }
+            outTextures.push_back(std::move(texture));
+        }
+
+        if (metadataOut != nullptr) {
+            metadataOut->clear();
+            for (const size_t offset : textureOffsets) {
+                metadataOut->push_back({"", static_cast<uint32_t>(offset)});
+            }
+        }
+
+        if (!outTextures.empty()) {
+            LOGI("GVM extraído por blocos GVRT/PVRT: %zu textura(s).",
+                 outTextures.size());
+            return true;
+        }
+
+        LOGW("Nenhum bloco GVRT/PVRT encontrado no GVM.");
+        return false;
+    }
+
     LOGI("Total de texturas encontradas no pacote: %u", header->entryCount);
 
     std::vector<PVMTextureMetadata> entriesList;

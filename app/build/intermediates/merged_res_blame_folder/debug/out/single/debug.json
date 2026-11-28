@@ -4,8 +4,16 @@
         "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\mipmap-mdpi\\ic_launcher.png"
     },
     {
+        "merged": "com.example.sa2b.app-merged_res-28:/layout_activity_translation.xml.flat",
+        "source": "com.example.sa2b.app-main-30:/layout/activity_translation.xml"
+    },
+    {
         "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\mipmap-xhdpi_ic_launcher.png.flat",
         "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\mipmap-xhdpi\\ic_launcher.png"
+    },
+    {
+        "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\layout_activity_translation.xml.flat",
+        "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\layout\\activity_translation.xml"
     },
     {
         "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\mipmap-hdpi_ic_launcher.png.flat",
@@ -20,12 +28,12 @@
         "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\mipmap-xxhdpi\\ic_launcher.png"
     },
     {
-        "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\layout_activity_splash.xml.flat",
-        "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\layout\\activity_splash.xml"
+        "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\layout_activity_game.xml.flat",
+        "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\layout\\activity_game.xml"
     },
     {
-        "merged": "com.example.sa2b.app-merged_res-28:/layout_activity_game.xml.flat",
-        "source": "com.example.sa2b.app-main-30:/layout/activity_game.xml"
+        "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\layout_activity_splash.xml.flat",
+        "source": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-main-30:\\layout\\activity_splash.xml"
     },
     {
         "merged": "C:\\Users\\hiury\\.gradle\\daemon\\8.5\\com.example.sa2b.app-merged_res-28:\\mipmap-xxxhdpi_ic_launcher.png.flat",

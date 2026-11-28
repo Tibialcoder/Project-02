@@ -3341,9 +3341,12 @@ id transition_layout_save
 id transition_position
 id transition_scene_layoutid_cache
 id transition_transform
+id translationProgressBar
 id triangle
 id txtCurrentFile
 id txtProgress
+id txtTranslationProgress
+id txtTranslationTitle
 id unchecked
 id uniform
 id unlabeled
@@ -3477,6 +3480,7 @@ layout abc_tooltip
 layout activity_game
 layout activity_main
 layout activity_splash
+layout activity_translation
 layout custom_dialog
 layout design_bottom_navigation_item
 layout design_bottom_sheet_dialog

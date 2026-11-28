@@ -13,6 +13,7 @@ add_library(
         resource_file_manager.cpp
         resource_pipeline.cpp
         pvm_parser.cpp
+        gvr_parser.cpp
 )
 
 find_library(log-lib log)

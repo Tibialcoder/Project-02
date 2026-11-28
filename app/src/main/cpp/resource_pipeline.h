@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <functional>
 #include <string>
 
 bool temTradutor(const std::filesystem::path& caminho);
@@ -16,4 +17,6 @@ void processarPastaRecursos(
 void organizarBinariosParaTraducao(const std::string& baseDirPath);
 void processOnlySupportedFiles(const std::string& baseDirPath);
 bool modelFileExists(const std::string& path);
-void processModelsWithChecks(const std::string& baseDirPath);
+void processModelsWithChecks(
+        const std::string& baseDirPath,
+        const std::function<void()>& onFileTranslated = {});

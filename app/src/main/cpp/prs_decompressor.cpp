@@ -6,9 +6,12 @@
 #include <cstdio>
 #include <dirent.h>
 #include <fstream>
+#include <future>
 #include <sys/stat.h>
+#include <thread>
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <limits>
 
 #define PRS_PIPELINE_LOG_TAG "SA2B_PIPELINE_PRS"
@@ -26,13 +29,69 @@ std::string getFileExtension(const std::string& filename) {
     return extension;
 }
 
+std::string inferResourceExtension(const std::vector<uint8_t>& data) {
+    if (data.size() < 4) return ".bin";
+
+    const char* magic = reinterpret_cast<const char*>(data.data());
+    if (std::memcmp(magic, "GVMH", 4) == 0) return ".gvm";
+    if (std::memcmp(magic, "PVMH", 4) == 0
+            || std::memcmp(magic, "PVM\0", 4) == 0
+            || std::memcmp(magic, "PVLS", 4) == 0) {
+        return ".pvm";
+    }
+
+    // Texturas GVR/PVR podem começar com GBIX ou outro chunk antes do
+    // bloco de pixels; procure o cabeçalho real em todo o payload.
+    for (size_t offset = 0; offset + 16 <= data.size(); ++offset) {
+        const bool isGvrt =
+                std::memcmp(data.data() + offset, "GVRT", 4) == 0;
+        const bool isPvrt =
+                std::memcmp(data.data() + offset, "PVRT", 4) == 0;
+        if (!isGvrt && !isPvrt) continue;
+
+        const uint16_t width = static_cast<uint16_t>(
+                (static_cast<uint16_t>(data[offset + 12]) << 8u)
+                | data[offset + 13]);
+        const uint16_t height = static_cast<uint16_t>(
+                (static_cast<uint16_t>(data[offset + 14]) << 8u)
+                | data[offset + 15]);
+        if (width != 0 && height != 0) {
+            return isGvrt ? ".gvr" : ".pvr";
+        }
+    }
+
+    return ".bin";
+}
+
 // Descomprime um fluxo PRS (bits de controle LSB-first, cópias curtas e longas).
 bool DecompressPRS(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
     constexpr size_t kMaxOutputSize = 256u * 1024u * 1024u;
     dst.clear();
-    if (src.empty()) return false;
-
     size_t inputPos = 0;
+
+    auto fail = [&](const char* reason, int offset = 0, size_t length = 0) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                PRS_PIPELINE_LOG_TAG,
+                "PRS inválido: %s (entrada=%zu/%zu, saída=%zu, offset=%d, len=%zu)",
+                reason,
+                inputPos,
+                src.size(),
+                dst.size(),
+                offset,
+                length);
+        dst.clear();
+        return false;
+    };
+
+    if (src.empty()) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                PRS_PIPELINE_LOG_TAG,
+                "PRS inválido: arquivo vazio");
+        return false;
+    }
+
     uint8_t controlByte = 0;
     unsigned int controlBitsRemaining = 0;
 
@@ -42,7 +101,7 @@ bool DecompressPRS(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
             controlByte = src[inputPos++];
             controlBitsRemaining = 8;
         }
-        const int bit = controlByte & 1u;
+        const int bit = static_cast<int>(controlByte & 1u);
         controlByte >>= 1u;
         --controlBitsRemaining;
         return bit;
@@ -55,38 +114,41 @@ bool DecompressPRS(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
 
     while (true) {
         const int literalFlag = readBit();
-        if (literalFlag < 0) return false;
+        if (literalFlag < 0) return fail("faltou flag literal");
 
         if (literalFlag != 0) {
             const int value = readByte();
-            if (value < 0 || dst.size() >= kMaxOutputSize) return false;
+            if (value < 0) return fail("faltou byte literal");
+            if (dst.size() >= kMaxOutputSize) return fail("limite de saída excedido");
             dst.push_back(static_cast<uint8_t>(value));
             continue;
         }
 
         const int longCopyFlag = readBit();
-        if (longCopyFlag < 0) return false;
+        if (longCopyFlag < 0) return fail("faltou flag de cópia");
 
         size_t copyLength;
         int copyOffset;
         if (longCopyFlag != 0) {
             const int lowByte = readByte();
             const int highByte = readByte();
-            if (lowByte < 0 || highByte < 0) return false;
+            if (lowByte < 0 || highByte < 0) {
+                return fail("faltaram bytes da cópia longa");
+            }
 
             const uint16_t packedOffset = static_cast<uint16_t>(
                     lowByte | (highByte << 8));
             if (packedOffset == 0) return !dst.empty();
 
             const uint16_t encodedOffset = packedOffset >> 3u;
-            copyOffset = (encodedOffset & 0x1000u) != 0
-                    ? static_cast<int>(encodedOffset) - 0x2000
-                    : static_cast<int>(encodedOffset);
+            // O campo de deslocamento PRS é sempre um offset negativo de
+            // 13 bits relativo ao fim do buffer descompactado.
+            copyOffset = static_cast<int>(encodedOffset) - 0x2000;
 
             const unsigned int lengthCode = packedOffset & 0x7u;
             if (lengthCode == 0) {
                 const int extendedLength = readByte();
-                if (extendedLength < 0) return false;
+                if (extendedLength < 0) return fail("faltou comprimento estendido");
                 copyLength = static_cast<size_t>(extendedLength) + 1;
             } else {
                 copyLength = static_cast<size_t>(lengthCode) + 2;
@@ -95,20 +157,32 @@ bool DecompressPRS(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
             const int bit0 = readBit();
             const int bit1 = readBit();
             const int offsetByte = readByte();
-            if (bit0 < 0 || bit1 < 0 || offsetByte < 0) return false;
+            if (bit0 < 0 || bit1 < 0 || offsetByte < 0) {
+                return fail("faltaram dados da cópia curta");
+            }
 
-            copyLength = static_cast<size_t>((bit0 | (bit1 << 1)) + 2);
-            copyOffset = static_cast<int8_t>(static_cast<uint8_t>(offsetByte));
+            // O PRS lê o primeiro bit como o bit mais significativo.
+            copyLength = static_cast<size_t>(((bit0 << 1) | bit1) + 2);
+            // Cópias curtas usam um deslocamento negativo de 8 bits;
+            // o byte armazenado representa 256 + offset (-256..-1).
+            copyOffset = offsetByte - 0x100;
         }
 
-        if (copyOffset >= 0 || static_cast<size_t>(-copyOffset) > dst.size()
-                || copyLength > kMaxOutputSize - dst.size()) {
-            return false;
+        if (copyOffset >= 0) {
+            return fail("offset de cópia não é negativo", copyOffset, copyLength);
+        }
+        if (static_cast<size_t>(-copyOffset) > dst.size()) {
+            return fail("offset aponta antes do início da saída", copyOffset, copyLength);
+        }
+        if (copyLength > kMaxOutputSize - dst.size()) {
+            return fail("cópia excede limite de saída", copyOffset, copyLength);
         }
 
         size_t copyPos = dst.size() - static_cast<size_t>(-copyOffset);
         for (size_t i = 0; i < copyLength; ++i) {
-            if (copyPos >= dst.size()) return false;
+            if (copyPos >= dst.size()) {
+                return fail("cópia ultrapassou a saída disponível", copyOffset, copyLength);
+            }
             dst.push_back(dst[copyPos++]);
         }
     }
@@ -152,9 +226,94 @@ std::vector<uint8_t> descomprimirPRS(const std::vector<uint8_t>& comprimido) {
     return saida;
 }
 
-void processPipelineWithDecompressed(const std::string& baseDirPath) {
+static bool processSinglePRS(const std::string& srcFilePath) {
+    const size_t slash = srcFilePath.find_last_of('/');
+    const std::string sourceDir = slash == std::string::npos
+            ? "."
+            : srcFilePath.substr(0, slash);
+    const std::string fileName = slash == std::string::npos
+            ? srcFilePath
+            : srcFilePath.substr(slash + 1);
+
+    const std::vector<uint8_t> compressedData =
+            lerArquivoBinario(srcFilePath);
+    if (compressedData.empty()) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                PRS_PIPELINE_LOG_TAG,
+                "PRS vazio ou ilegível: %s",
+                srcFilePath.c_str());
+        return false;
+    }
+
+    std::vector<uint8_t> decompressedData;
+    if (!DecompressPRS(compressedData, decompressedData)
+            || decompressedData.empty()) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                PRS_PIPELINE_LOG_TAG,
+                "Falha ao descompactar PRS: %s (%zu bytes)",
+                fileName.c_str(),
+                compressedData.size());
+        return false;
+    }
+
+    const size_t lastDot = fileName.find_last_of('.');
+    std::string cleanName = lastDot == std::string::npos
+            ? fileName
+            : fileName.substr(0, lastDot);
+    if (getFileExtension(cleanName).empty()) {
+        cleanName += inferResourceExtension(decompressedData);
+    }
+    if (getFileExtension(cleanName) == ".rgba") {
+        cleanName.replace(cleanName.find_last_of('.'), std::string::npos, ".tga");
+    }
+
+    const std::string outputPath = sourceDir + "/" + cleanName;
+    bool writeSucceeded = false;
+    if (getFileExtension(cleanName) == ".tga") {
+        writeSucceeded = salvarTGA(outputPath, decompressedData, 256, 256);
+    } else {
+        std::ofstream outFile(outputPath, std::ios::binary | std::ios::trunc);
+        if (outFile.is_open()) {
+            outFile.write(
+                    reinterpret_cast<const char*>(decompressedData.data()),
+                    static_cast<std::streamsize>(decompressedData.size()));
+            writeSucceeded = outFile.good();
+            outFile.close();
+            writeSucceeded = writeSucceeded && outFile.good();
+        }
+    }
+
+    if (!writeSucceeded) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                PRS_PIPELINE_LOG_TAG,
+                "Falha ao salvar saída PRS: %s",
+                outputPath.c_str());
+        return false;
+    }
+
+    struct stat outputStatus {};
+    const bool outputCommitted =
+            stat(outputPath.c_str(), &outputStatus) == 0
+            && outputStatus.st_size > 0;
+    if (!outputCommitted) return false;
+
+    if (std::remove(srcFilePath.c_str()) != 0) {
+        __android_log_print(
+                ANDROID_LOG_WARN,
+                PRS_PIPELINE_LOG_TAG,
+                "Saída criada, mas não foi possível remover o PRS: %s",
+                fileName.c_str());
+    }
+    return true;
+}
+
+void processPipelineWithDecompressed(
+        const std::string& baseDirPath,
+        const std::function<void()>& onFileTranslated) {
     const std::string tempPath = baseDirPath + "/temp";
-    const std::string decompPath = tempPath + "/decompressed";
     createDecompressedDirectory(baseDirPath);
 
     const std::vector<std::string> sourceDirs = {
@@ -165,6 +324,7 @@ void processPipelineWithDecompressed(const std::string& baseDirPath) {
             tempPath + "/ui",
             tempPath + "/misc"
     };
+    std::vector<std::string> pendingFiles;
 
     for (const std::string& sourceDir : sourceDirs) {
         DIR* dir = opendir(sourceDir.c_str());
@@ -180,66 +340,39 @@ void processPipelineWithDecompressed(const std::string& baseDirPath) {
 
             const std::string srcFilePath = sourceDir + "/" + fileName;
             struct stat sourceStatus {};
-            if (stat(srcFilePath.c_str(), &sourceStatus) != 0
-                    || !S_ISREG(sourceStatus.st_mode)) {
-                continue;
-            }
-
-            const std::vector<uint8_t> compressedData =
-                    lerArquivoBinario(srcFilePath);
-            if (compressedData.empty()) continue;
-
-            const std::vector<uint8_t> decompressedData =
-                    descomprimirPRS(compressedData);
-            if (decompressedData.empty()) {
-                __android_log_print(
-                        ANDROID_LOG_ERROR,
-                        PRS_PIPELINE_LOG_TAG,
-                        "Falha ao descompactar PRS: %s",
-                        fileName.c_str());
-                continue;
-            }
-
-            const size_t lastDot = fileName.find_last_of('.');
-            const std::string cleanName = fileName.substr(0, lastDot);
-            const std::string decompFilePath = decompPath + "/" + cleanName;
-
-            bool writeSucceeded = false;
-            if (getFileExtension(cleanName) == ".rgba") {
-                // O nome .rgba indica que o payload descompactado já contém pixels RGBA.
-                writeSucceeded = salvarRGBA(
-                        decompFilePath, decompressedData, 256, 256);
-            } else {
-                std::ofstream outFile(
-                        decompFilePath, std::ios::binary | std::ios::trunc);
-                if (!outFile.is_open()) continue;
-
-                outFile.write(
-                        reinterpret_cast<const char*>(decompressedData.data()),
-                        static_cast<std::streamsize>(decompressedData.size()));
-                writeSucceeded = outFile.good();
-                outFile.close();
-                writeSucceeded = writeSucceeded && outFile.good();
-            }
-            if (!writeSucceeded) continue;
-
-            __android_log_print(
-                    ANDROID_LOG_INFO,
-                    PRS_PIPELINE_LOG_TAG,
-                    "Descompactado em temp/decompressed: %s",
-                    cleanName.c_str());
-            if (std::remove(srcFilePath.c_str()) != 0) {
-                __android_log_print(
-                        ANDROID_LOG_WARN,
-                        PRS_PIPELINE_LOG_TAG,
-                        "Não foi possível remover o PRS original: %s",
-                        fileName.c_str());
+            if (stat(srcFilePath.c_str(), &sourceStatus) == 0
+                    && S_ISREG(sourceStatus.st_mode)) {
+                pendingFiles.push_back(srcFilePath);
             }
         }
-
         closedir(dir);
     }
 
-    // Arquivos revelados ficam em temp/decompressed para processamento posterior.
+    const unsigned int workerCount = std::max(
+            2u,
+            std::min(
+                    4u,
+                    std::thread::hardware_concurrency() == 0
+                            ? 2u
+                            : std::thread::hardware_concurrency()));
+    std::vector<std::future<bool>> futures;
+    futures.reserve(workerCount);
+
+    for (const std::string& filePath : pendingFiles) {
+        futures.push_back(std::async(
+                std::launch::async,
+                processSinglePRS,
+                filePath));
+
+        if (futures.size() >= workerCount) {
+            const bool translated = futures.front().get();
+            futures.erase(futures.begin());
+            if (translated && onFileTranslated) onFileTranslated();
+        }
+    }
+
+    for (std::future<bool>& future : futures) {
+        if (future.get() && onFileTranslated) onFileTranslated();
+    }
 }
 

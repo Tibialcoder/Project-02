@@ -53,6 +53,11 @@ std::string classifyFile(const std::string& filename) {
         return "audio";
     }
 
+    // Bancos text_*.bin são tabelas de texto, não recursos de textura.
+    if (lowerName.rfind("text_", 0) == 0) {
+        return "misc";
+    }
+
     // 2. Texturas (.pvm, .prs que sejam de textura, ou imagens)
     if (lowerName.find(".pvm") != std::string::npos ||
         lowerName.find("tex") != std::string::npos ||
@@ -60,12 +65,12 @@ std::string classifyFile(const std::string& filename) {
         return "textures";
     }
 
-    // 3. UI / Menus (arquivos comuns de interface, fontes ou diálogos)
+    // Recursos de UI (menus, fontes e mensagens) seguem como texturas comuns.
     if (lowerName.find("ui") != std::string::npos ||
         lowerName.find("menu") != std::string::npos ||
         lowerName.find("font") != std::string::npos ||
         lowerName.find("message") != std::string::npos) {
-        return "ui";
+        return "textures";
     }
 
     // 4. Modelos 3D (.sa2, .nj, .njm)

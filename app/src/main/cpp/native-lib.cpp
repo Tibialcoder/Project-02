@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <chrono>
 #include <limits>
+#include <random>
 #include <filesystem>
 #include "prs_decompressor.h"
 #include "texture_translation.h"
@@ -40,27 +41,166 @@ namespace fs = std::filesystem;
 
 #define THREAD_LOG_TAG "SA2B_THREAD"
 
-void backgroundTranslationTask(std::string baseDir) {
+static JavaVM* g_javaVm = nullptr;
+
+size_t countPendingTranslationFiles(const std::string& baseDir) {
+    size_t pending = 0;
+    const std::vector<fs::path> directories = {
+            fs::path(baseDir) / "temp/models",
+            fs::path(baseDir) / "temp/textures"
+    };
+
+    for (const fs::path& directory : directories) {
+        std::error_code error;
+        if (!fs::exists(directory, error) || error) continue;
+        for (fs::directory_iterator entry(directory, error), end;
+                !error && entry != end; entry.increment(error)) {
+            std::error_code statusError;
+            if (!entry->is_regular_file(statusError) || statusError) continue;
+            const std::string extension =
+                    getFileExtension(entry->path().filename().string());
+            if (extension == ".gvm" || extension == ".pvm") continue;
+            ++pending;
+        }
+    }
+    return pending;
+}
+
+size_t countPendingPrsFiles(const std::string& baseDir) {
+    size_t pending = 0;
+    const std::vector<fs::path> directories = {
+            fs::path(baseDir) / "temp",
+            fs::path(baseDir) / "temp/models",
+            fs::path(baseDir) / "temp/textures",
+            fs::path(baseDir) / "temp/audio",
+            fs::path(baseDir) / "temp/ui",
+            fs::path(baseDir) / "temp/misc"
+    };
+    for (const fs::path& directory : directories) {
+        std::error_code error;
+        for (fs::directory_iterator entry(directory, error), end;
+                !error && entry != end; entry.increment(error)) {
+            std::error_code statusError;
+            if (entry->is_regular_file(statusError)
+                    && !statusError
+                    && getFileExtension(entry->path().filename().string()) == ".prs") {
+                ++pending;
+            }
+        }
+    }
+    return pending;
+}
+
+void notifyTranslationPreparing(
+        JNIEnv* env, jobject activity, int prepared, int total) {
+    if (env == nullptr || activity == nullptr) return;
+    jclass clazz = env->GetObjectClass(activity);
+    jmethodID method = env->GetMethodID(
+            clazz, "onTranslationPreparing", "(II)V");
+    if (method != nullptr) {
+        env->CallVoidMethod(activity, method, prepared, total);
+    }
+    env->DeleteLocalRef(clazz);
+}
+
+void notifyTranslationOrganizing(JNIEnv* env, jobject activity) {
+    if (env == nullptr || activity == nullptr) return;
+    jclass clazz = env->GetObjectClass(activity);
+    jmethodID method = env->GetMethodID(
+            clazz, "onTranslationOrganizing", "()V");
+    if (method != nullptr) env->CallVoidMethod(activity, method);
+    env->DeleteLocalRef(clazz);
+}
+
+void notifyTranslationProgress(
+        JNIEnv* env,
+        jobject activity,
+        int translated,
+        int total) {
+    if (env == nullptr || activity == nullptr) return;
+    jclass clazz = env->GetObjectClass(activity);
+    jmethodID method = env->GetMethodID(clazz, "onTranslationProgress", "(II)V");
+    if (method != nullptr) {
+        env->CallVoidMethod(activity, method, translated, total);
+    }
+    env->DeleteLocalRef(clazz);
+}
+
+void notifyTranslationFinished(JNIEnv* env, jobject activity) {
+    if (env == nullptr || activity == nullptr) return;
+    jclass clazz = env->GetObjectClass(activity);
+    jmethodID method = env->GetMethodID(clazz, "onTranslationFinished", "()V");
+    if (method != nullptr) {
+        env->CallVoidMethod(activity, method);
+    }
+    env->DeleteLocalRef(clazz);
+}
+
+void backgroundTranslationTask(
+        std::string baseDir,
+        JavaVM* javaVm,
+        jobject activity) {
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (javaVm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (javaVm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            env = nullptr;
+        } else {
+            attached = true;
+        }
+    }
+
+    // Mostra progresso já durante a descompactação que antecede a tradução.
+    const int totalPrs = static_cast<int>(countPendingPrsFiles(baseDir));
+    int preparedPrs = 0;
+    notifyTranslationPreparing(env, activity, 0, totalPrs);
+    processPipelineWithDecompressed(baseDir, [&]() {
+        ++preparedPrs;
+        notifyTranslationPreparing(env, activity, preparedPrs, totalPrs);
+    });
+
+    notifyTranslationOrganizing(env, activity);
+    organizarBinariosParaTraducao(baseDir);
+    processOnlySupportedFiles(baseDir);
+
+    const size_t totalFiles = countPendingTranslationFiles(baseDir);
+    int translatedFiles = 0;
+
     __android_log_print(
             ANDROID_LOG_INFO,
             THREAD_LOG_TAG,
-            "Iniciando tradução em segundo plano...");
+            "Iniciando conversão de %zu arquivo(s) preparado(s).",
+            totalFiles);
+    notifyTranslationProgress(env, activity, 0, static_cast<int>(totalFiles));
 
-    processPipelineWithDecompressed(baseDir);
-    organizarBinariosParaTraducao(baseDir);
-    processOnlySupportedFiles(baseDir);
-    processModelsWithChecks(baseDir);
+    const auto reportFileTranslated = [&]() {
+        ++translatedFiles;
+        notifyTranslationProgress(
+                env,
+                activity,
+                translatedFiles,
+                static_cast<int>(totalFiles));
+    };
+
+    processTexturesWithChecks(baseDir, reportFileTranslated);
+    processModelsWithChecks(baseDir, reportFileTranslated);
+    notifyTranslationFinished(env, activity);
 
     __android_log_print(
             ANDROID_LOG_INFO,
             THREAD_LOG_TAG,
             "Tradução concluída!");
+
+    if (javaVm != nullptr) {
+        env->DeleteGlobalRef(activity);
+        if (attached) javaVm->DetachCurrentThread();
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_sa2b_MainActivity_nativeStartTranslationAsync(
         JNIEnv* env,
-        jobject /* thiz */,
+        jobject thiz,
         jstring jOutputPath) {
     if (jOutputPath == nullptr) {
         __android_log_print(
@@ -71,18 +211,75 @@ Java_com_example_sa2b_MainActivity_nativeStartTranslationAsync(
     }
 
     const char* outputDir = env->GetStringUTFChars(jOutputPath, nullptr);
-    if (outputDir == nullptr) {
-        return;
-    }
+    if (outputDir == nullptr) return;
 
-    std::string baseDir = std::string(outputDir) + "/Project-02";
+    std::string baseDir(outputDir);
     env->ReleaseStringUTFChars(jOutputPath, outputDir);
+    env->GetJavaVM(&g_javaVm);
 
-    std::thread worker(backgroundTranslationTask, std::move(baseDir));
+    jobject activity = env->NewGlobalRef(thiz);
+    std::thread worker(
+            backgroundTranslationTask,
+            std::move(baseDir),
+            g_javaVm,
+            activity);
     worker.detach();
 }
 
 #define AUTO_PIPELINE_LOG_TAG "SA2B_AUTO_PIPELINE"
+
+static bool hasPendingTranslationFiles(const std::string& baseDir) {
+    const std::vector<fs::path> directories = {
+            fs::path(baseDir) / "temp/models",
+            fs::path(baseDir) / "temp/textures",
+            fs::path(baseDir) / "temp/audio",
+            fs::path(baseDir) / "temp/ui",
+            fs::path(baseDir) / "temp/misc",
+            fs::path(baseDir) / "bin/textures",
+            fs::path(baseDir) / "bin/ui",
+            fs::path(baseDir) / "bin/misc"
+    };
+
+    for (const fs::path& directory : directories) {
+        std::error_code error;
+        if (!fs::exists(directory, error) || error) continue;
+        for (const fs::directory_entry& entry :
+                fs::directory_iterator(directory, error)) {
+            if (error) break;
+            if (!entry.is_regular_file(error)) continue;
+
+            const std::string extension =
+                    getFileExtension(entry.path().filename().string());
+            if (extension == ".prs"
+                    || extension == ".gvm"
+                    || extension == ".pvm"
+                    || extension == ".gvr"
+                    || extension == ".pvr"
+                    || (extension == ".bin"
+                            && directory.parent_path().filename() == "bin"
+                            && (directory.filename() == "textures"
+                                    || directory.filename() == "misc"))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_sa2b_MainActivity_nativeHasPendingTranslations(
+        JNIEnv* env,
+        jobject /* thiz */,
+        jstring jBasePath) {
+    if (jBasePath == nullptr) return JNI_FALSE;
+
+    const char* pathChars = env->GetStringUTFChars(jBasePath, nullptr);
+    if (pathChars == nullptr) return JNI_FALSE;
+
+    const bool pending = hasPendingTranslationFiles(pathChars);
+    env->ReleaseStringUTFChars(jBasePath, pathChars);
+    return pending ? JNI_TRUE : JNI_FALSE;
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_sa2b_MainActivity_nativeInitPipeline(
@@ -398,7 +595,6 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
     std::string pathModels   = baseDir + "/models";
     std::string pathTextures = baseDir + "/textures";
     std::string pathAudio    = baseDir + "/audio";
-    std::string pathUI       = baseDir + "/ui";
     std::string pathMisc     = baseDir + "/misc";
     std::string pathBin      = baseDir + "/bin";
 
@@ -407,13 +603,11 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
     createDirectory(pathModels);
     createDirectory(pathTextures);
     createDirectory(pathAudio);
-    createDirectory(pathUI);
     createDirectory(pathMisc);
     createDirectory(pathBin);
     createDirectory(pathBin + "/models");
     createDirectory(pathBin + "/textures");
     createDirectory(pathBin + "/audio");
-    createDirectory(pathBin + "/ui");
     createDirectory(pathBin + "/misc");
 
     // Lê o cabeçalho e a FST
@@ -462,7 +656,6 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
             if (category == "models") targetFolder = pathModels;
             else if (category == "textures") targetFolder = pathTextures;
             else if (category == "audio") targetFolder = pathAudio;
-            else if (category == "ui") targetFolder = pathUI;
             else targetFolder = pathMisc;
 
             // Isola apenas o nome base do arquivo
@@ -497,97 +690,219 @@ Java_com_example_sa2b_MainActivity_nativeExtractAll(JNIEnv* env, jobject thiz, j
 
     fclose(isoFile);
 
-    // Processa somente os formatos permitidos; os demais permanecem em temp.
-    processarPastaRecursos(fs::path(pathTemp) / "models", fs::path(pathModels));
-    processarPastaRecursos(fs::path(pathTemp) / "textures", fs::path(pathTextures));
-    processarPastaRecursos(fs::path(pathTemp) / "audio", fs::path(pathAudio));
-    processarPastaRecursos(fs::path(pathTemp) / "ui", fs::path(pathUI));
-    processarPastaRecursos(fs::path(pathTemp) / "misc", fs::path(pathMisc));
-
-    // Exporta metadados dos PVMs que ficaram pendentes em temp/textures.
-    processOnlySupportedFiles(baseDir);
+    // A extração termina aqui. A tradução é iniciada pela Activity
+    // para que a UI possa trocar de tela e acompanhar o progresso.
 
     env->ReleaseStringUTFChars(jOutputDir, outputDir);
     __android_log_print(ANDROID_LOG_INFO, "SA2B_ISO", "Assets organizados e extraídos com sucesso nas pastas!");
     return JNI_TRUE;
 }
 
-GLuint loadTextureToGPU(const std::string& textureFilePath, int width, int height) {
-    if (width <= 0 || height <= 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "SA2B_RENDERER",
-                "Dimensões inválidas para textura: %d x %d", width, height);
+GLuint loadTextureToGPU(const std::string& textureFilePath) {
+    std::ifstream file(textureFilePath, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) return 0;
+    const std::streamsize fileSize = file.tellg();
+    if (fileSize < 18) return 0;
+    file.seekg(0, std::ios::beg);
+
+    uint8_t header[18] = {};
+    if (!file.read(reinterpret_cast<char*>(header), sizeof(header))) return 0;
+    const uint16_t width = static_cast<uint16_t>(header[12])
+            | (static_cast<uint16_t>(header[13]) << 8u);
+    const uint16_t height = static_cast<uint16_t>(header[14])
+            | (static_cast<uint16_t>(header[15]) << 8u);
+    const uint8_t bitsPerPixel = header[16];
+    const size_t bytesPerPixel = bitsPerPixel / 8u;
+    if (header[1] != 0 || header[2] != 2
+            || (bitsPerPixel != 24 && bitsPerPixel != 32)
+            || width == 0 || height == 0) {
+        __android_log_print(ANDROID_LOG_WARN, "SA2B_RENDERER",
+                "TGA não suportado: %s", textureFilePath.c_str());
         return 0;
     }
 
-    std::ifstream file(textureFilePath, std::ios::binary);
-    if (!file.is_open()) {
-        __android_log_print(ANDROID_LOG_ERROR, "SA2B_RENDERER",
-                "Erro ao abrir textura traduzida: %s", textureFilePath.c_str());
-        return 0;
-    }
+    const size_t pixelCount = static_cast<size_t>(width) * height;
+    if (pixelCount > (std::numeric_limits<size_t>::max() / 4u)) return 0;
+    const size_t sourceSize = pixelCount * bytesPerPixel;
+    const size_t dataOffset = 18u + header[0];
+    if (dataOffset > static_cast<size_t>(fileSize)
+            || sourceSize > static_cast<size_t>(fileSize) - dataOffset) return 0;
 
-    const size_t dataSize = static_cast<size_t>(width)
-            * static_cast<size_t>(height) * 4;
-    std::vector<uint8_t> rgbaData(dataSize);
-    file.read(reinterpret_cast<char*>(rgbaData.data()),
-              static_cast<std::streamsize>(rgbaData.size()));
+    file.seekg(static_cast<std::streamoff>(dataOffset), std::ios::beg);
+    std::vector<uint8_t> sourcePixels(sourceSize);
+    if (!file.read(reinterpret_cast<char*>(sourcePixels.data()),
+                   static_cast<std::streamsize>(sourceSize))) return 0;
 
-    if (file.gcount() != static_cast<std::streamsize>(rgbaData.size())) {
-        __android_log_print(ANDROID_LOG_ERROR, "SA2B_RENDERER",
-                "Arquivo de textura incompleto: %s", textureFilePath.c_str());
-        return 0;
+    std::vector<uint8_t> rgbaPixels(pixelCount * 4u);
+    const bool topOrigin = (header[17] & 0x20u) != 0;
+    const bool rightOrigin = (header[17] & 0x10u) != 0;
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            const uint32_t sourceX = rightOrigin ? width - 1u - x : x;
+            const uint32_t sourceY = topOrigin ? y : height - 1u - y;
+            const size_t sourceIndex =
+                    (static_cast<size_t>(sourceY) * width + sourceX) * bytesPerPixel;
+            const size_t targetIndex =
+                    (static_cast<size_t>(y) * width + x) * 4u;
+            rgbaPixels[targetIndex] = sourcePixels[sourceIndex + 2u];
+            rgbaPixels[targetIndex + 1u] = sourcePixels[sourceIndex + 1u];
+            rgbaPixels[targetIndex + 2u] = sourcePixels[sourceIndex];
+            rgbaPixels[targetIndex + 3u] =
+                    bytesPerPixel == 4u ? sourcePixels[sourceIndex + 3u] : 255u;
+        }
     }
 
     GLuint textureId = 0;
     glGenTextures(1, &textureId);
-    if (textureId == 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "SA2B_RENDERER",
-                "Falha ao criar textura OpenGL.");
-        return 0;
-    }
-
+    if (textureId == 0) return 0;
     glBindTexture(GL_TEXTURE_2D, textureId);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-            GL_RGBA, GL_UNSIGNED_BYTE, rgbaData.data());
-
+            GL_RGBA, GL_UNSIGNED_BYTE, rgbaPixels.data());
     glBindTexture(GL_TEXTURE_2D, 0);
     __android_log_print(ANDROID_LOG_INFO, "SA2B_RENDERER",
-            "Textura carregada com sucesso na GPU! ID: %u", textureId);
+            "TGA %s carregado (%ux%u), ID OpenGL %u",
+            textureFilePath.c_str(), width, height, textureId);
     return textureId;
 }
 
-// Estado do ciclo de teste das texturas traduzidas.
 auto lastSwitchTime = std::chrono::steady_clock::now();
 int currentTextureIndex = 0;
 std::vector<std::string> translatedTextureFiles;
 GLuint currentTextureGPUId = 0;
+GLuint textureTestProgram = 0;
 
-void updateAndRenderTextureLoop() {
-    auto currentTime = std::chrono::steady_clock::now();
-    auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(
-            currentTime - lastSwitchTime).count();
-
-    if (elapsedSeconds >= 5 && !translatedTextureFiles.empty()) {
-        lastSwitchTime = currentTime;
-        currentTextureIndex =
-                (currentTextureIndex + 1) % translatedTextureFiles.size();
-
-        const std::string& nextTexPath =
-                translatedTextureFiles[currentTextureIndex];
-
-        if (currentTextureGPUId != 0) {
-            glDeleteTextures(1, &currentTextureGPUId);
-            currentTextureGPUId = 0;
-        }
-
-        currentTextureGPUId = loadTextureToGPU(nextTexPath, 256, 256);
+static GLuint compileTextureShader(GLenum type, const char* source) {
+    const GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+    GLint compiled = GL_FALSE;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    if (compiled == GL_FALSE) {
+        glDeleteShader(shader);
+        return 0;
     }
+    return shader;
 }
+
+static void initializeTextureRenderTest() {
+    translatedTextureFiles.clear();
+    const fs::path textureDirectory =
+            "/storage/emulated/0/Documents/Project-02/textures";
+    std::error_code error;
+    for (fs::directory_iterator entry(textureDirectory, error), end;
+            !error && entry != end; entry.increment(error)) {
+        if (entry->is_regular_file(error)
+                && getFileExtension(entry->path().filename().string()) == ".tga") {
+            translatedTextureFiles.push_back(entry->path().string());
+        }
+    }
+    if (translatedTextureFiles.empty()) {
+        __android_log_print(ANDROID_LOG_WARN, "SA2B_RENDERER",
+                "Nenhum arquivo .tga encontrado em %s",
+                textureDirectory.string().c_str());
+        return;
+    }
+
+    static const char* vertexSource =
+            "attribute vec2 aPosition; attribute vec2 aTexCoord; "
+            "varying vec2 vTexCoord; void main(){ "
+            "gl_Position=vec4(aPosition,0.0,1.0); vTexCoord=aTexCoord; }";
+    static const char* fragmentSource =
+            "precision mediump float; varying vec2 vTexCoord; "
+            "uniform sampler2D uTexture; void main(){ "
+            "gl_FragColor=texture2D(uTexture,vTexCoord); }";
+    const GLuint vertexShader =
+            compileTextureShader(GL_VERTEX_SHADER, vertexSource);
+    const GLuint fragmentShader =
+            compileTextureShader(GL_FRAGMENT_SHADER, fragmentSource);
+    if (vertexShader == 0 || fragmentShader == 0) return;
+
+    textureTestProgram = glCreateProgram();
+    glAttachShader(textureTestProgram, vertexShader);
+    glAttachShader(textureTestProgram, fragmentShader);
+    glLinkProgram(textureTestProgram);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    GLint linked = GL_FALSE;
+    glGetProgramiv(textureTestProgram, GL_LINK_STATUS, &linked);
+    if (linked == GL_FALSE) {
+        glDeleteProgram(textureTestProgram);
+        textureTestProgram = 0;
+        return;
+    }
+
+    static std::mt19937 randomEngine(std::random_device{}());
+    std::shuffle(
+            translatedTextureFiles.begin(),
+            translatedTextureFiles.end(),
+            randomEngine);
+    currentTextureIndex = 0;
+    currentTextureGPUId = loadTextureToGPU(translatedTextureFiles.front());
+    lastSwitchTime = std::chrono::steady_clock::now();
+}
+
+static void updateTextureTest() {
+    if (translatedTextureFiles.empty()) return;
+    const auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::seconds>(
+                now - lastSwitchTime).count() < 5) return;
+    lastSwitchTime = now;
+    if (currentTextureIndex + 1 >= translatedTextureFiles.size()) {
+        const std::string previousTexture =
+                translatedTextureFiles[currentTextureIndex];
+        static std::mt19937 randomEngine(std::random_device{}());
+        std::shuffle(
+                translatedTextureFiles.begin(),
+                translatedTextureFiles.end(),
+                randomEngine);
+        if (translatedTextureFiles.size() > 1
+                && translatedTextureFiles.front() == previousTexture) {
+            std::swap(translatedTextureFiles.front(), translatedTextureFiles[1]);
+        }
+        currentTextureIndex = 0;
+    } else {
+        ++currentTextureIndex;
+    }
+    if (currentTextureGPUId != 0) glDeleteTextures(1, &currentTextureGPUId);
+    currentTextureGPUId = loadTextureToGPU(
+            translatedTextureFiles[currentTextureIndex]);
+}
+
+static void renderTextureTest() {
+    glClearColor(0.08f, 0.08f, 0.08f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    updateTextureTest();
+    if (textureTestProgram == 0 || currentTextureGPUId == 0) return;
+
+    static const GLfloat vertices[] = {
+            -1.f, -1.f, 0.f, 1.f,
+             1.f, -1.f, 1.f, 1.f,
+            -1.f,  1.f, 0.f, 0.f,
+             1.f,  1.f, 1.f, 0.f
+    };
+    glUseProgram(textureTestProgram);
+    const GLint position = glGetAttribLocation(textureTestProgram, "aPosition");
+    const GLint texCoord = glGetAttribLocation(textureTestProgram, "aTexCoord");
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glEnableVertexAttribArray(static_cast<GLuint>(position));
+    glEnableVertexAttribArray(static_cast<GLuint>(texCoord));
+    glVertexAttribPointer(static_cast<GLuint>(position), 2, GL_FLOAT,
+            GL_FALSE, 4 * sizeof(GLfloat), vertices);
+    glVertexAttribPointer(static_cast<GLuint>(texCoord), 2, GL_FLOAT,
+            GL_FALSE, 4 * sizeof(GLfloat), vertices + 2);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, currentTextureGPUId);
+    glUniform1i(glGetUniformLocation(textureTestProgram, "uTexture"), 0);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisableVertexAttribArray(static_cast<GLuint>(position));
+    glDisableVertexAttribArray(static_cast<GLuint>(texCoord));
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 
 GLuint CreateTestTexture() {
     int width = 256;
@@ -736,16 +1051,11 @@ bool loadPVMTextureFromAssets(const char* filename) {
 // 5. Função chamada quando a superfície OpenGL é criada
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_sa2b_MainActivity_nativeInit(JNIEnv* env, jclass clazz) {
-    LOGI("OpenGL ES inicializado com sucesso via nativeInit!");
-    // Inicializações de shaders, buffers ou texturas podem ser feitas aqui
+    LOGI("Inicializando teste de renderização das texturas TGA.");
+    initializeTextureRenderTest();
 }
 
-// 6. Função chamada a cada frame para renderizar e colorir a tela
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_sa2b_MainActivity_nativeRender(JNIEnv* env, jclass clazz) {
-    // Define uma cor sólida na tela (ex: Azul claro) para tirar a tela cinza
-    glClearColor(0.2f, 0.6f, 1.0f, 1.0f);
-
-    // Limpa o buffer de cor da tela com a cor definida acima
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderTextureTest();
 }

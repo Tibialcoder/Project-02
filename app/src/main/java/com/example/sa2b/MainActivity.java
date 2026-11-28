@@ -10,7 +10,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
-import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.activity.result.ActivityResultLauncher;
@@ -31,10 +30,9 @@ public class MainActivity extends AppCompatActivity {
     public static native void initAssetManager(AssetManager assetManager);
     public static native void nativeInit();
     public static native void nativeRender();
-    public static native void nativeLoadISO(int fileDescriptor);
-    public native boolean nativeExtractFile(int fileDescriptor, String fileName, String outputPath);
     public native boolean nativeExtractAll(int fileDescriptor, String outputDirPath);
-    public native void nativeInitPipeline(String basePath);
+    public native boolean nativeHasPendingTranslations(String basePath);
+    public native void nativeStartTranslationAsync(String basePath);
     private GLSurfaceView glSurfaceView;
     private TextView txtProgress;
     private TextView txtCurrentFile;
@@ -42,7 +40,6 @@ public class MainActivity extends AppCompatActivity {
     private int currentIndex = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable assetCyclerRunnable;
-    private static final int PICK_ISO_REQUEST = 42;
 
     private final ActivityResultLauncher<Intent> folderPickerLauncher = registerForActivityResult(
         new ActivityResultContracts.StartActivityForResult(),
@@ -100,10 +97,6 @@ public class MainActivity extends AppCompatActivity {
         File documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
         File project02Dir = new File(documentsDir, "Project-02");
 
-        // Processa arquivos pendentes em segundo plano sem bloquear a abertura da tela.
-        new Thread(() -> nativeInitPipeline(project02Dir.getAbsolutePath()),
-                "sa2b-init-pipeline").start();
-
         if (isFirstBoot(project02Dir)) {
             setContentView(R.layout.activity_main);
 
@@ -113,6 +106,9 @@ public class MainActivity extends AppCompatActivity {
                 // Abre o seletor de arquivos filtrando por qualquer tipo binário/genérico
                 isoPickerLauncher.launch(new String[]{"*/*"});
             });
+        } else if (nativeHasPendingTranslations(project02Dir.getAbsolutePath())) {
+            setContentView(R.layout.activity_translation);
+            nativeStartTranslationAsync(project02Dir.getAbsolutePath());
         } else {
             startGameEngine();
         }
@@ -122,9 +118,72 @@ public class MainActivity extends AppCompatActivity {
     public void onExtractionProgress(int current, int total) {
         runOnUiThread(() -> {
             if (txtProgress != null) {
-                int remaining = total - current;
-                txtProgress.setText("Extraindo: " + current + " de " + total + " (Faltam: " + remaining + ")");
+                int remaining = Math.max(0, total - current);
+                txtProgress.setText("Extraindo: " + current + " de " + total
+                        + " (Faltam: " + remaining + ")");
             }
+        });
+    }
+
+    public void onTranslationPreparing(int prepared, int total) {
+        runOnUiThread(() -> {
+            TextView title = findViewById(R.id.txtTranslationTitle);
+            TextView progress = findViewById(R.id.txtTranslationProgress);
+            android.widget.ProgressBar bar = findViewById(R.id.translationProgressBar);
+            if (title != null) title.setText("Preparando arquivos para tradução...");
+            if (progress != null) {
+                progress.setText(total > 0
+                        ? "Arquivos preparados: " + prepared + " de " + total
+                        : "Preparando arquivos...");
+            }
+            if (bar != null) {
+                if (total > 0) {
+                    bar.setIndeterminate(false);
+                    bar.setMax(total);
+                    bar.setProgress(Math.min(prepared, total));
+                } else {
+                    bar.setIndeterminate(true);
+                }
+            }
+        });
+    }
+
+    public void onTranslationOrganizing() {
+        runOnUiThread(() -> {
+            TextView title = findViewById(R.id.txtTranslationTitle);
+            TextView progress = findViewById(R.id.txtTranslationProgress);
+            android.widget.ProgressBar bar = findViewById(R.id.translationProgressBar);
+            if (title != null) title.setText("Organizando arquivos...");
+            if (progress != null) progress.setText("Preparando texturas e modelos");
+            if (bar != null) bar.setIndeterminate(true);
+        });
+    }
+
+    public void onTranslationProgress(int translated, int total) {
+        runOnUiThread(() -> {
+            TextView title = findViewById(R.id.txtTranslationTitle);
+            TextView progress = findViewById(R.id.txtTranslationProgress);
+            android.widget.ProgressBar bar = findViewById(R.id.translationProgressBar);
+            if (title != null) title.setText("Traduzindo assets do Sonic Adventure 2...");
+            if (progress != null) {
+                progress.setText("Traduzidos: " + translated + " de " + total
+                        + " (Restam: " + Math.max(0, total - translated) + ")");
+            }
+            if (bar != null) {
+                bar.setIndeterminate(false);
+                bar.setMax(Math.max(1, total));
+                bar.setProgress(Math.min(translated, Math.max(1, total)));
+            }
+        });
+    }
+
+    public void onTranslationFinished() {
+        runOnUiThread(() -> {
+            TextView progress = findViewById(R.id.txtTranslationProgress);
+            if (progress != null) {
+                progress.setText("Tradução concluída!");
+            }
+            startGameEngine();
         });
     }
 
@@ -149,17 +208,10 @@ public class MainActivity extends AppCompatActivity {
 
             runOnUiThread(() -> {
                 if (success) {
-                    Log.i("SA2B_ROM", "Extração finalizada com sucesso! Inicializando o motor OpenGL ES...");
+                    Log.i("SA2B_ROM", "Extração finalizada. Iniciando tradução...");
 
-                    // 1. Cria a sua GLSurfaceView personalizada (ou a padrão do Android)
-                    SA2BGLSurfaceView glSurfaceView = new SA2BGLSurfaceView(MainActivity.this);
-
-                    // 2. Substitui o layout do botão/texto atual pelo motor gráfico em tela cheia
-                    MainActivity.this.glSurfaceView = glSurfaceView;
-                    setContentView(R.layout.activity_game);
-                    MainActivity.this.glSurfaceView = findViewById(R.id.glSurfaceView);
-                    initializeAssetCycle();
-
+                    setContentView(R.layout.activity_translation);
+                    nativeStartTranslationAsync(outputDirPath);
                 } else {
                     Log.e("SA2B_ROM", "Falha na extração dos arquivos.");
                 }
@@ -243,79 +295,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Ao tocar na tela, abre o seletor de arquivos para o usuário escolher a ISO do jogo
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            abrirSeletorDeIso();
-            return true;
-        }
-        return super.onTouchEvent(event);
-    }
-
-    private void abrirSeletorDeIso() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*"); // Você pode usar "application/octet-stream" se preferir
-        startActivityForResult(intent, PICK_ISO_REQUEST);
-    }
-
-    // Chame este método quando quiser que o usuário escolha a pasta (ex: ao clicar num botão "Selecionar Pasta de Mods"):
+    // A seleção de ISO fica disponível somente no botão da tela inicial.
+    // Não há mais um listener global de toque nesta Activity.
     public void openFolderSelector() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         folderPickerLauncher.launch(intent);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        android.util.Log.d("SA2B_Java", "onActivityResult chamado. ResultCode: " + resultCode);
-
-        if (requestCode == PICK_ISO_REQUEST && resultCode == RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            android.util.Log.d("SA2B_Java", "URI do arquivo selecionado: " + (uri != null ? uri.toString() : "null"));
-
-            try {
-                // Exemplo usando o FileDescriptor que você já pegou da ISO
-                ParcelFileDescriptor pfd = getContentResolver().openFileDescriptor(uri, "r");
-                if (pfd != null) {
-                    int fd = pfd.getFd();
-
-                    // 1. Primeiro você pode chamar o carregamento geral da ISO
-                    nativeLoadISO(fd);
-
-                    // Cria a pasta Project-02 dentro do diretório público Documents do dispositivo
-                    File documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
-                    File project02Dir = new File(documentsDir, "Project-02");
-
-                    if (!project02Dir.exists()) {
-                        boolean created = project02Dir.mkdirs();
-                        if (created) {
-                            Log.i("SA2B_Modding", "Pasta Project-02 criada com sucesso em Documents!");
-                        }
-                    }
-
-                    // O caminho completo que será passado para o C++ extrair os arquivos
-                    String outputDirPath = project02Dir.getAbsolutePath();
-
-                    // 2. Agora você pode extrair qualquer arquivo de dentro da ISO para a pasta Project-02!
-                    File outputFile = new File(project02Dir, "alphaTitle.prs");
-                    boolean extracted = nativeExtractFile(fd, "alphaTitle.prs", outputFile.getAbsolutePath());
-
-                    if (extracted) {
-                        Log.i("SA2B", "Arquivo extraído com sucesso para: " + outputFile.getAbsolutePath());
-                    }
-
-                    pfd.close();
-                } else {
-                    Log.e("SA2B_Java", "ParcelFileDescriptor é NULL!");
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
-            android.util.Log.w("SA2B_Java", "Seleção de arquivo cancelada ou dados nulos.");
-        }
     }
 
     @Override
